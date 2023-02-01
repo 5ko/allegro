@@ -1,0 +1,23 @@
+/**
+  Ace - Highlight textareas for PmWiki
+  Written by (c) Petko Yotov 2022    www.pmwiki.org/petko
+
+  This text is written for PmWiki; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published
+  by the Free Software Foundation version 2.
+*/
+
+.ace_editor {
+  position: relative !important;
+  border: 1px solid #999;
+  display: block;
+  max-width: 100%;
+  resize: both;
+}
+
+textarea[data-ace] {
+  display: none;
+}
+
+
+

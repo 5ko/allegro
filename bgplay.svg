@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" height="100" width="100" stroke-width="0" fill="rgba(0,0,0,.5)">
+  <circle cx="50" cy="50" r="50" />
+<!--   <path  d="M 32.679 80 V 20 L 84.641 50 z" fill="none" stroke="rgba(0,0,0,1)" stroke-width="10" stroke-linejoin="round" /> -->
+  <path  d="M 32.679 80 V 20 L 84.641 50 z" fill="white" /> <!--rgba(0,0,0,.8)-->
+</svg>

@@ -1,0 +1,1051 @@
+/**
+  Allegro: Modular, visual ditor for PmWiki
+  Written by (c) Petko Yotov 2017-2022   www.pmwiki.org/support
+
+  This text is written for PmWiki; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published
+  by the Free Software Foundation; either version 3 of the License, or
+  (at your option) any later version. See pmwiki.php for full details
+  and lack of warranty.
+*/
+
+
+trix-editor {
+  max-height: 60vh;
+  overflow: auto;
+}
+.allegro-editor {
+  margin: .5em 0;
+}
+
+trix-toolbar .trix-dialog {
+  font-size: .95em;
+}
+:root {
+  --tree-lines:  1px solid #888;
+  --theme-bgcolor-blue: #cef;
+  --theme-bgcolor-grey: #eee;
+  --theme-color: #08acfe;
+  
+}
+
+.allegro-tree ul {
+  margin: 0px 0px 0px 3px;
+  list-style: none;
+  line-height: 1.4em;
+  padding: 0 0 0 1.1em;
+}
+.allegro-tree ul li {
+  position: relative;
+}
+.allegro-tree ul li:before {
+  position: absolute;
+  left: -15px;
+  top: 0px;
+  content: '';
+  display: block;
+  border-left: var(--tree-lines);
+  height: 0.7em;
+  border-bottom: var(--tree-lines);
+  width: 12px;
+}
+.allegro-tree ul li:after {
+  position: absolute;
+  left: -15px;
+  bottom: -7px;
+  content: '';
+  display: block;
+  border-left: var(--tree-lines);
+  height: 100%;
+}
+.allegro-tree ul li:last-child:after {
+  display: none;
+}
+
+trix-toolbar .trix-dialog .allegro-tree ul {
+  padding-left: 1.6em;
+}
+trix-toolbar .trix-dialog .allegro-tree a {
+  display: block;
+  padding: 2px 6px;
+}
+
+trix-toolbar .trix-dialog .allegro-tree a:hover {
+  background-color: var(--theme-bgcolor-blue);
+  text-decoration: none;
+}
+
+nav a {
+  text-decoration: none;
+}
+
+nav a:hover {
+  text-decoration: underline;
+}
+
+trix-editor sup,
+trix-editor sub,
+button.trix-button-aside span,
+button.trix-button sup,
+button.trix-button sub {
+  color: red;
+  background-color: yellow;
+}
+
+button.trix-button--icon-quote,
+button.trix-button--icon-code,
+button.trix-button--icon-heading-1,
+button.trix-button--icon-strike {
+  display: none;
+}
+
+
+nav.allegro-subpages > p:first-child,
+.trix-content h2, .allegro-content details[data-type="h2"] > summary {
+  background-color: var(--theme-bgcolor-grey);
+}
+.allegro-content details > summary > h2,
+.allegro-content details > summary > h3 {
+  display: inline;
+}
+
+.trix-content h2, details[data-type="h2"] > summary {
+  background-color: var(--theme-bgcolor-grey);
+  color:  var(--theme-color);
+  padding-left: 6px;
+}
+
+
+.trix-content h3, details[data-type="h3"] > summary {
+  background-color: var(--theme-bgcolor-grey);
+  padding-left: 6px;
+}
+
+a[href^="Tag:"], a[href^="tag:"], a.taglink,
+allegro-tag {
+  display: inline-block;
+  border: var(--tree-lines);
+  border-radius: 3px;
+  padding: 0 5px !important;
+  background-color: var(--theme-bgcolor-blue);
+  line-height: 1;
+  text-decoration: none;
+  color: inherit;
+}
+allegro-tag a {
+  color: inherit;
+  text-decoration: none;
+}
+allegro-tag {
+/*   background-color: #fca; */
+}
+
+.trix-content blockquote, .trix-content .frame {
+  border: 1px solid #aaa;
+  border-radius: .3em;
+  margin: 1em 0 .3em 0;
+  padding: 0.6em;
+  background-color: #f9f9f9;
+}
+
+#allegroembedmenu {
+  width: 25em;
+  top: -0.9em;
+  font-size: 0.9em;
+}
+
+#allegroembedmenu button {
+  font-weight: normal;
+  font-size: 1em;
+  cursor: pointer;
+  display: block;
+  border: none;
+  width: 100%;
+  text-align: left;
+  padding: 4px 8px;
+}
+
+#allegroembedmenu button:hover {
+  background-color: var(--theme-bgcolor-blue);
+  
+}
+
+#allegroembedform,
+#allegroembedvideo {
+  max-width: 600px;
+}
+
+
+
+.allegro-preview {
+  margin-top: 1em;
+  text-align: center;
+}
+
+iframe, video { max-width: 100%; }
+
+.videocoverPreview video {
+  max-width: 640px;
+}
+
+figure.attachment--preview > video + a {
+  display: block;
+}
+
+.trix-content aside,
+.allegro-content aside { 
+  display: block; 
+  border: 2px dashed red; 
+  padding: .5em;
+  border-radius: .5em; 
+}
+
+  
+
+.flipcomment {
+  float: right;
+  cursor: pointer;
+}
+
+.flipcomment + aside {
+  display: none;
+}
+
+.flipcomment.checked + aside {
+  display: block;
+}
+
+
+
+
+.allegro-content a.closevideo { cursor: pointer; }
+
+.allegro-content figure.attachment iframe + a.closevideo + a { display: none; }
+ 
+.allegro-content figure.attachment > video + a img { display: none; }
+
+
+.allegro-content figure.attachment--preview:not(.attachment--mp4) figcaption.attachment__caption:not(.attachment__caption--edited) {
+  display: none;
+}
+
+.allegro-content figure.attachment--preview a[href$=".mp4"] img[src$=".mp4.webp"] + figcaption.attachment__caption:not(.attachment__caption--edited) {
+  display: block;
+}
+
+.trix-dialog__flex {
+  display: flex;
+  align-items: baseline;
+}
+
+.trix-content figure.attachment--preview {
+  margin-bottom: 1em;
+}
+
+.trix-content figure.attachment a[href="#"]:not(.closevideo) {
+  cursor: default;
+}
+
+/*.trix-content figure.attachment--svg a[href="#"] figcaption.attachment__caption {
+  display: none;
+}*/
+
+
+trix-editor figure.attachment img + figcaption:not(.attachment__caption--edited,.attachment__caption--editing) {
+  display: none;
+}
+
+.trix-content figure.attachment figcaption.attachment__caption--edited, 
+.trix-content figure.attachment figcaption.attachment__caption--editing {
+  display: block;
+}
+
+
+trix-editor figure.attachment--svg a[href="#"] + .attachment__toolbar  .attachment__metadata {
+  display: none;
+}
+
+nav.allegro-subpages > p:first-child,
+.trix-content h2, .trix-content h3, .allegro-content.PmTOCdiv {
+  margin-top: 1em;
+  margin-bottom: .5em;
+}
+
+.allegro-content details:not([open]) > summary {
+  position: relative;
+}
+.allegro-content details:not([open]) > summary::after {
+  content: "■ ■ ■";
+  display: block;
+  font-size: 0.5em;
+  position: absolute;
+  bottom: 2px;
+  right: 6px;
+}
+
+
+nav.allegro-subpages ul {
+  display: flex;
+  padding: 8px 0;
+  margin: 0;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  list-style-type: none;
+  gap: 8px 4px;
+}
+nav.allegro-subpages li {
+  padding: 0;
+  width: calc(100% / 3 - 2 * 2px);
+  margin: 0;
+}
+
+nav.allegro-subpages li a {
+  display: block;
+  padding: 4px 8px;
+  border: var(--tree-lines);
+  white-space: pre;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  border-radius: 4px;
+}
+
+nav.allegro-subpages li a:hover {
+  background-color:  var(--theme-bgcolor-blue);
+  text-decoration: none;
+}
+
+@media screen and (max-width:30em) {
+  nav.allegro-subpages li {
+    width: 49.5%;
+    width: calc(50% - 2px);
+  }
+  
+}
+@media screen and (max-width:18em) {
+  nav.allegro-subpages li {
+    width: 100%;
+  }
+  nav.allegro-subpages ul {
+    row-gap: 4px;
+  }
+  
+}
+
+#allegroeditform nav.allegro-subpages a {
+  color: black;
+  cursor: move;
+}
+
+#allegroeditform nav.allegro-subpages {
+  display: none;
+}
+.sortable-ghost {
+  opacity: .5;
+}
+
+.inputbox, .inputbutton,
+#allegroeditform select {
+  border: var(--tree-lines);
+  border-radius: 3px;
+  padding: 4px 8px;
+  margin: 4px 0;
+}
+
+#allegroeditform input[name="allegrotitle"] {
+  font-size: 1.4rem;
+}
+
+
+nav.allegro-breadcrumbs {
+  font-size: 13px;
+  line-height: 17px;
+}
+nav.allegro-breadcrumbs > ul {
+  display: flex;
+  padding: 8px 0;
+  margin: 0;
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+  list-style-type: none;
+  min-width: 0;
+}
+
+nav.allegro-breadcrumbs li {
+  padding: 0;
+  margin: 0 0 .4em 0;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+nav.allegro-breadcrumbs li:before {
+  content: "/";
+  float: right;
+  color: red;
+  padding: 0 .3em 0 .2em;
+  font-weight: bold;
+}
+
+/* Filterable search field cannot be aligned. */
+.allegro-content table.simpletable {
+  margin: .5em 0;
+}
+
+.allegro-content table.simpletable th {
+/*   vertical-align:top; */
+}
+
+textarea.trix-input--dialog {
+  max-width: 100%;
+}
+
+.trix-dialog {
+/*   max-width: 600px; */
+}
+
+
+figure[data-trix-content-type="allegro/form"] {
+  border-radius: 8px 8px 0 0;
+}
+
+figure[data-trix-content-type="allegro/form"] {
+  border: var(--tree-lines);
+}
+
+
+figure[data-trix-content-type="allegro/form"]:before {
+  content: "Form";
+  font-weight: bold;
+  background-color: var(--theme-bgcolor-blue);
+  padding: 0 8px;
+}
+
+
+
+
+figure[data-trix-content-type="allegro/form"] {
+  padding: 0 8px 0 0;
+  line-height: 1.3;
+}
+
+figure[data-trix-content-type="allegro/form"]::before {
+  padding: 6px 8px;
+  line-height: 2;
+  margin-right: 8px;
+  border-radius: 8px 0 0 0;
+}
+
+
+body {
+  counter-reset: ref-counter;
+}
+
+.allegro-content figure[data-trix-content-type="allegro/ref"] {
+  display:none;
+}
+
+ol.footnotes a.backlink {
+  text-decoration: none;
+}
+
+.allegro-content a.allegro-ref:target,
+ol.footnotes li.target,
+ol.footnotes li:target {
+  background-color: #bff;
+}
+
+
+
+figure[data-trix-content-type="allegro/ref"] > div:not(.attachment__toolbar),
+figure[data-trix-content-type="allegro/ref"] > span {
+  display: none;
+}
+
+figure[data-trix-content-type="allegro/ref"]:before {
+  counter-increment: ref-counter;
+  content: " [" counter(ref-counter) "] ";
+  color: blue;
+  background-color: #bff;
+}
+
+div.allegro-ref-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+a.allegro-ref {
+  position: relative;
+  top: -0.4em;
+  font-size: .83em;
+  line-height: 0.5em;
+  vertical-align: baseline;
+  text-decoration: none;
+}
+
+div.allegro-ref-wrap div.allegro-ref-content {
+  display:none;
+  position: absolute;
+  background-color: white;
+  width: 20em;
+  max-width: calc(100vw - 5px);
+  left: 0px;
+  font-size: 1rem;
+  line-height: 1.3rem;
+  color: black;
+  padding: .5em;
+  border: 1px solid #555;
+  border-radius: 3px;
+  box-shadow: 4px 4px 4px rgba(128, 128, 128, .5);
+}
+
+div.allegro-ref-wrap:hover div.allegro-ref-content {
+  display:block;
+  z-index: 2;
+/*   width: 20em; */
+}
+
+
+.allegro-calc {
+  position: relative;
+}
+
+form.allegro-calc label {
+  font-weight: normal;
+}
+
+form.allegro-calc label:first-child {
+  display: block;
+}
+
+form.allegro-calc input + label {
+  padding-left: .3em;
+}
+
+#libcalcformPreview, .libcalcformPreview, 
+form.allegro-calc + figure[data-trix-content-type="allegro/form"] {
+  display: none;
+}
+
+
+form.allegro-calc div.input.focused {
+  background-color: var(--theme-bgcolor-blue);
+  border: var(--tree-lines);
+}
+
+form.allegro-calc div.input.readonly.focused {
+  background-color: var(--theme-bgcolor-grey);
+  border: var(--tree-lines);
+}
+
+.allegro-calc.flow2 > div.button,
+.allegro-calc.flow3 > div.button,
+.allegro-calc.flow2 > div.input,
+.allegro-calc.flow3 > div.input {
+  display: inline-block;
+  max-width: 13em;
+  padding: .5em;
+  border-radius: .2em;
+  border: 1px solid transparent;
+}
+
+
+.allegro-calc.flow3 input {
+  max-width: 12em;
+}
+
+.allegro-calc.flow2 input {
+  max-width: 18em;
+}
+.allegro-calc > div.table,
+.allegro-calc > div.divhtml,
+.allegro-calc > div.note {
+  padding: 0 .5em;
+}
+
+.allegro-calc.flow2 > div.button,
+.allegro-calc.flow2 > div.input {
+  max-width: 20em;  
+}
+.allegro-calc.flow2 > div.input .prefix + input {
+  max-width: 12em;  
+}
+
+.allegro-calc.flow2 > div.button,
+.allegro-calc.flow3 > div.button  {
+  padding: .5em;
+}
+
+
+table.simpletable td.afcell {
+  text-align: right;
+}
+
+table.aftable-rmodes td.afcell:after,
+table.roommodes td[data-role]:after {
+  content: ' Hz';
+  color: #888;
+  font-style: italic;
+  font-size: 83%;
+}
+
+table.simpletable th, table.simpletable td {
+  padding: 0 4px;
+}
+
+.hidden {
+  display:none;
+}
+
+form.allegro-calc div.alert {
+  margin: 0 .5em .5em .5em;
+}
+form.allegro-calc div.alert span[data-role="allegroalert"] {
+  color: red;
+}
+  
+.allegro-close-alert {
+  color: var(--theme-color);
+  cursor: pointer;
+  font-weight: bold;
+  padding: 0 0 0 1em;
+}
+
+[data-role] span[title] {
+  border-bottom: 1.5px dotted #f40;
+}
+
+.allegrotablewrap {
+  margin: 0 auto;
+  display: table;
+}
+
+
+.allegro-calc input[size="3"] {
+  width: 4em;
+}
+
+.allegro-calc input[size="4"] {
+  width: 5em;
+}
+
+.allegro-calc input[size="5"] {
+  width: 6em;
+}
+
+.allegro-calc input[size="6"] {
+  width: 7em;
+}
+
+.allegro-calc input[size="7"] {
+  width: 8em;
+}
+
+.allegro-calc input[size="8"] {
+  width: 9em;
+}
+
+.allegro-calc input[size="9"] {
+  width: 10em;
+}
+
+.allegro-calc input[size="10"] {
+  width: 11em;
+}
+
+.allegro-calc input[size="11"] {
+  width: 12em;
+}
+
+.allegro-calc input[size="12"] {
+  width: 13em;
+}
+
+.allegro-calc input[size="13"] {
+  width: 14em;
+}
+
+
+/*.allegro-calc:hover:before {
+  content: "#" attr(id);
+  color: rgba(0,0,0,.5);
+  position: absolute;
+  top: -1em;
+  right: 0;
+}*/
+
+.allegro-calc textarea:read-only,
+.allegro-calc input[type="number"]:read-only,
+.allegro-calc input[type="text"]:read-only {
+  background-color: #eee;
+}
+
+.allegro-calc.previewed {
+  background-color: #ff8;
+}
+.allegro-calc {
+  transition: background-color 2s ease;
+}
+
+#libcalcftype[data-val="inverse"] ~ div.ace_editor, 
+#libcalcftype[data-val="linear"] ~ div.ace_editor {
+  display: none;
+}
+
+#libcalcform .has_errors {
+  color: red;
+  display: none;
+}
+#libcalcform [data-annotations]:not([data-annotations="0"])  ~ .has_errors {
+    display: inline;
+}
+
+#libcalcform textarea[data-ace] {
+/*   display: none; */
+}
+
+#fielderrors:before {
+  content: attr(data-errors);
+  font-weight: bold;
+  color: red;
+  margin-right: .3em;
+}
+
+
+
+
+
+
+.ace_separator {
+  font-weight: bold;
+/*   background-color: #ffa; */
+}
+
+.ace_field_name_variable,
+.ace_read_only_field_name_variable {
+  font-weight: bold;
+  color: blue;
+}
+
+.ace_read_only_field_name_variable {
+  background-color: #ccc;
+}
+
+.ace_comment {
+  color: #888;
+}
+
+
+.ace_initial_value {
+  color: green;
+}
+
+.ace_linear_scale {
+  color: teal;
+}
+
+.ace_formula {
+  color: magenta;
+}
+.ace_result_precision {
+  color: brown;
+}
+.ace_increment_step {
+  color: purple;
+}
+.ace_minimum_value {
+  color: orange;
+}
+
+.ace_maximum_value {
+  color: red;
+}
+.ace_field_type {
+  color: navy;
+}
+.ace_prefix {
+  color: limegreen;
+}
+.ace_suffix {
+  color: limegreen;
+}
+.ace_note, .ace_label {
+  color: #8e1876;
+}
+
+.ace_previous_line_continuation:before {
+  content: "↳";
+  color: #88f;
+  position:absolute;
+  top:0;
+  left: 0;
+}
+
+
+.ace_table_cell_break,
+.ace_line_break  {
+  color: red;
+}
+
+.ace_superscript, .ace_subscript {
+  color: green;
+}
+
+
+.ace_bold_italic, .ace_italic, .ace_bold {
+  font-weight: bold;
+}
+
+.allegro-calc .invalid {
+  background-color: #fcc;
+}
+.highlighted {
+  background-color: #ffa;
+}
+
+
+
+
+dl.monoterm dt,
+.ace_field_name_variable,
+.ace_read_only_field_name_variable, .ace_comment, 
+.ace_initial_value, .ace_linear_scale, .ace_formula, .ace_result_precision, .ace_increment_step, 
+.ace_minimum_value, .ace_maximum_value, .ace_field_type, .ace_prefix, .ace_suffix, .ace_label {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+}
+
+.trix-dialog--ref ul.bibliolist {
+  list-style-type: none;
+  margin: .5em 0;
+  padding: 0;
+  max-height: 200px;
+  overflow: auto;
+}
+
+.trix-dialog--ref ul.bibliolist li {
+  list-style-type: none;
+  margin: 0;
+  padding: 1mm 0;
+  border-top: 1px solid #888;
+  white-space:pre;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.allegrotrail {
+  text-align: center;
+  margin-top: 1em;
+  display:flex;
+  justify-content: center;
+}
+
+.allegrotrail a {
+  text-decoration: none;
+  display: inline-block;
+}
+
+.allegrotrail a.allegrotrail-prevlink {
+  border-right: 1px solid #999;
+  padding-right: .5em;
+  margin-right: .5em;
+}
+
+.allegrotrail a.allegrotrail-nextlink {
+  border-left: 1px solid #999;
+  padding-left: .5em;
+  margin-left: .5em;
+}
+
+#allegrodeletebtn {
+  background-color: #fcc;
+/*   float: right; */
+}
+
+#allegrocancelbtn {
+  background-color: #ffc;
+}
+#allegrosavebtn {
+  background-color: #cfc;
+}
+
+a.wikilink[data-status]:before {
+  content: " ";
+  margin: 0 0.25em 2px 0px;
+  display: inline-block;
+  vertical-align: middle;
+  width: .6em;
+  height: .6em;
+  border-radius: 2px;
+  border: 1px solid #800;
+  background-color: #fcc;
+}
+
+a.wikilink[data-status=""]:before,
+#wikifoot a.wikilink[data-status]:before,
+#wikicmds a.wikilink[data-status]:before,
+a.wikilink[href*="?action="][data-status]:before,
+a.wikilink[data-group="Site"]:before,
+a.wikilink[data-group="SiteAdmin"]:before,
+a.wikilink[data-group="Profiles"]:before,
+a.wikilink[data-group="Forms"]:before,
+a.wikilink[data-group="PmWiki"]:before,
+.nostatus a.wikilink[data-status]:before,
+.sidehead a.wikilink[data-status]:before {
+  display: none;
+}
+
+
+nav.allegro-breadcrumbs > ul > li:first-child a.wikilink[data-status]:before {
+  display: none;
+}
+
+a.wikilink[data-status="sandbox"]:before {
+  border-style: dotted;
+/*   background-color: #fcc; */
+}
+
+a.wikilink[data-status="reviewed"]:before {
+  border-color: green;
+  background-color: #cfc;
+}
+
+
+a.wikilink[data-status="hidden"]:before {
+  border-color: #888;
+  background-color: #ccc;
+}
+
+a.wikilink[data-status="pending"]:before {
+  border-color: orangered;
+  background-color: #fc0;
+}
+
+nav.allegro-listpages ul,
+nav.allegro-dictindex ul {
+  list-style-type: none;
+  padding-left: 1.2em; 
+}
+
+nav.allegro-listpages li,
+nav.allegro-dictindex li {
+  margin-left: 1em;
+  text-indent: -1em;
+}
+
+nav.allegro-dictindex li.dictheader {
+  margin-left: 0em;
+  font-weight: bold;
+}
+
+nav.allegro-listpages ul,
+nav.allegro-dictindex {
+  column-width: 20em;
+}
+nav.allegro-dictindex h4 {
+  padding-left: .4em;
+}
+nav.allegro-dictindex ul:target {
+  background-color: #ffa;
+}
+
+
+.allegro-menu li {
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trix-content ol,
+.trix-content ul {
+/*    list-style-position: inside; */
+}
+
+.trix-content > ol > li,
+.trix-content > ul > li {
+   margin-left: 2em;
+}
+
+figure.attachment--preview a {
+  display: inline-block;
+  position: relative;
+}
+
+a[data-embed-provider]:before {
+  content: " ";
+  position: absolute;
+  background-image: url(bgplay.svg);
+  background-repeat: no-repeat;
+  background-position: 50% 50%;
+  background-repeat: no-repeat;
+  background-size: 25%;
+  top: 0px;
+  bottom:0px;
+  left:0px;
+  right:0px;
+}
+
+trix-editor figure.attachment--jpg>a[href^="https://vimeo.com/"]:after,
+trix-editor figure.attachment--jpg>a[href^="https://youtu.be/"]:after,
+a[data-embed-provider]:after {
+  content: attr(data-embed-provider);
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: rgba(0, 0, 0, .3);
+  color:white;
+  font-size: 83%;
+  padding: 5px;
+  line-height: 1;
+  border-radius: 5px;
+}
+
+trix-editor figure.attachment--jpg>a[href^="https://youtu.be/"]:after {
+  content: "YouTube";
+}
+
+trix-editor figure.attachment--jpg>a[href^="https://vimeo.com/"]:after {
+  content: "Vimeo";
+}
+
+a[data-jump] {
+  text-decoration: none;
+}
+
+.LaTeX {
+  font-family: 'CMU Serif', cmr10, LMRoman10-Regular, 'Latin Modern Math', 'Nimbus Roman No9 L', 'Times New Roman', Times, serif;
+  font-size: 118%;
+  line-height: 1;
+  white-space: nowrap;
+  -webkit-font-feature-settings: "lnum","tnum","kern" 0;
+  font-feature-settings: "lnum","tnum","kern" 0;
+  font-variant-numeric: lining-nums tabular-nums;
+  font-kerning: none;
+}
+.LaTeX .A {
+  text-transform: uppercase;
+  font-size: 0.75em;
+  vertical-align: 0.25em;
+  margin-left: -0.36em;
+  margin-right: -0.15em;
+  line-height: 1ex;
+}
+
+.LaTeX .E {
+  text-transform: uppercase;
+  vertical-align: -0.25em;
+  margin-left: -0.1667em;
+  margin-right: -0.125em;
+  line-height: 1ex;
+}
+
+.avoidbreak {
+  break-inside: avoid-column; 
+  
+}
+
+time[title] { 
+  color: navy;
+  border-bottom: 1px dotted navy;
+}
