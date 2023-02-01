@@ -31,7 +31,7 @@
   * Lazy Image Loading?
   
 */
-$RecipeInfo['Allegro']['Version'] = '20230131';
+$RecipeInfo['Allegro']['Version'] = '20230201';
 
 Markup("allegro", '<&amp;amp;', "/\\(:allegro( .*?)?:\\)\n?(.*?)\n?\\(:allegroend:\\)/is", 'FmtAllegro');
 
@@ -176,8 +176,6 @@ function FmtAllegro($m) {
   else
     $html = AllegroSanitizeHTML($html);
 
-//   xmp($html);
-  
   if(@$args['editor']) {
     $html = @"<div class='allegro-editor'>
       <trix-editor class='trix-content' input='allegrotext' placeholder='{$args['placeholder']}'></trix-editor>
@@ -268,7 +266,7 @@ function AllegroTrails($pagename, $html, $opt) {
   if($pos === false)  return $html; // bug?
   
   $out2 = '';
-//   xmps([$pos,$subpages ]);
+  
   if($pos) {
     $pn = $subpages[$pos-1];
     $out2 .= AllegroTrailLink($data, $g, $pn, 'prevlink');
@@ -460,7 +458,6 @@ function AllegroData($g, $save = false){
     }
     $data['=nextpagename'] = sprintf($Allegro['NextPageNameFmt'], $g, $max + 1);
     $AllegroData[$g] = $data;
-// //     xmps($data['=tree'], 1);
   }
   if($save) {
     $data = $AllegroData[$g];
@@ -507,7 +504,6 @@ function AllegroSubtree(&$data, $pn, $prevlevel=-1) {
     $sp = array('idx'=>$idx, 'parent'=>$pn);
     $sp = array_merge($sp, AllegroSubtree($data, $k, $level));
     $subpages[] = $sp;
-//     $subpages2[] = $k;
   }
   $data[$pn]['attached'] = 1;
   usort($subpages, 'AllegroSubpageSort');
@@ -538,7 +534,6 @@ function FmtAllegroLst($g, $names, $data, $args, $defaultcname, $defaultlabel) {
     $nt = $data[$nn]['title'] ?? $nn;
     $status = $data[$nn]['status'] ?? 'draft';
     $ntt = Keep ($nt);
-//     $out .= "* %astatus astatus-$status% [[ $g.$nn\"$ntt\" | $nt ]] \n";
     $out .= "* [[ $g.$nn\"$ntt\" | $nt ]] \n";
   } 
   if($out) {
@@ -586,22 +581,15 @@ function FmtAllegroLinks($m) {
     }
     $menu = [];
     $list = "";
-//     $uparr = Keep(&uparr;);
     foreach($dict2 as $letter=>$text) {
       $menu[] = "[[#dict_{$letter}|{$letter}]]";
-//       $list .= "&gt;&gt;avoidbreak&lt;&lt;\n!!!! %block id=dict_{$letter}% {$letter} [-[[#dict_top|&uarr;]]-] \n$text\n";
       $list .= "* %list avoidbreak id=dict_$letter% {$letter} [-[[#dict_top|&uarr;]]-]"
         ."%item dictheader%\n$text\n[==]\n";
     }
     
     $out = "(:nav class=\"$cname-menu frame\" id=dict_top:)" . implode(' | ', $menu) . " \n(:navend:)(:notoc:)\n\n"
       . "(:nav class=\"$cname\":)\n$list(:nl:)(:navend:)\n";
-//     xmps($data);
-    
-//     $out = pre_r($dict2);
-    
-    
-//     $out = "(:nav class=\"$cname\":)\n$out(:nl:)(:navend:)\n";
+      
     return PRR($out);
   }
   if($args['mode'] == 'linktree') {
@@ -726,7 +714,7 @@ function FmtAllegroLinks($m) {
 function AllegroTreeList($g, $tree, $level=0) {
   if(preg_match('/^Template/', $tree['pn'])) return '';
   $label = PHSC($tree['title']);
-//   xmps($tree);
+  
   $status = $tree['status']?? 'draft';
   $indent = str_repeat('*', $level);
   
@@ -904,9 +892,6 @@ function HandleAllegroEdit(&$pagename, $auth = 'edit') {
   }
   if($posted) {
     
-    
-
-    
     $pagedata = array();
     
     $parent = MakePageName($pagename, strval(@$_POST['ptv_Parent']));
@@ -971,10 +956,11 @@ function HandleAllegroEdit(&$pagename, $auth = 'edit') {
     $new["csum"] = $new["csum:$Now"] = $ChangeSummary;
     Lock(2);
     UpdatePage($pagename, $page, $new);
-    if(0 && @$_POST['delattach']) {
+//     if(0 && @$_POST['delattach']) {
+//       // instead, get and update the list of attachments for this page
 //       $dlist = explode(' ', $_POST['delattach']);
 //       foreach($dlist as $dfile) AllegroDelAttach($pagename, $dfile);
-    }
+//     }
     Lock(0);
     
     
@@ -1085,7 +1071,8 @@ function AllegroSanitizeVar($value) {
   return PPRA($ra, $value);
 }
 
-function AllegroSanitizeHTML($html) { # TODO
+# TODO Once existing pages are migrated this can be removed
+function AllegroSanitizeHTML($html) { 
   global $pagename, $UrlScheme;
   
   $schemehost = preg_quote($UrlScheme.'://'.$_SERVER['HTTP_HOST'] .'/', '/');
@@ -1095,7 +1082,6 @@ function AllegroSanitizeHTML($html) { # TODO
     "/<\\/(div|li|ul|ol|blockquote|h\\d|pre|figure|figcaption)>(?!\n)/" => "$0\n",
     "/<br[\\/\\s]*>\\s*/" => "$0\n",
   ];
-//   xmp([$ra, $html]);
 
 //   $html = PPRA($ra, $html);
   return $html;
@@ -1140,7 +1126,6 @@ function figure2wiki($m){
     if(preg_match('/^(youtube|vimeo)--(.+?)\\.jpg$/', $a['filename'], $yt)) {
       $caption = @$b['caption']? "|{$b['caption']}" : "";
       $imap = ucfirst($yt[1]);
-//       xmps($a);
       return "[[$imap$size:{$yt[2]}$caption]] ";
     }
     if(preg_match('/^(.+?\\.mp4)\\.jpg(\\?r=\\d+)?$/', $a['filename'], $vid)) {
@@ -1186,12 +1171,10 @@ function figure2wiki($m){
     $c = ($add) ? uncomment("|$add") : '';
     $id = @$a['bibId'] ? $a['bibId']: '-';
     $out =  "[[^$id$c]] ";
-//     xmp( $out );
     return $out;
   }
   
   $args['--content--'] = $content;
-  xmps([$m, $a, $args]);
   return "[[??FIGURE??]]";
 }
 
@@ -1364,9 +1347,7 @@ function wikiattach2html($m, $pagename) {
   
   if(!$ext) $ext = preg_replace('/^.*\\./', '', $a['filename']);
   $a['contentType'] = $UploadExts[$ext];
-  
-//   xmps($a);
-  
+    
   if($w || $h) { # attached file, download link
     $a['width'] = intval($w);
     $a['height'] = intval($h);
@@ -1461,8 +1442,6 @@ function wiki2html($pagename, $in, $edit=false) {
     '<div class="attachment-gallery attachment-gallery--$1">$2</div>', $out);
   $out = preg_replace('!\\s*(</?(?:ul|ol|div|br|aside|h\\d|blockquote)>)\\s*!', '$1', $out);
   
-//   xmps($out, 1);
-  
   return $out;
 }
 
@@ -1486,8 +1465,6 @@ function AllegroFormSaveTranslations($pagename, $page, $new) {
   
   $allstrings[$n] = $formstrings;
   aform_jfile($transfname, $allstrings);
-//   xmp($strings);
-  
 }
 
 
@@ -1496,9 +1473,9 @@ $HandleActions['libcalc'] = 'HandleLibCalc';
 function HandleLibCalc($pagename, $auth='read') {
   global $Allegro;
 //   $page = RetrieveAuthPage($pagename, $auth, false, READPAGE_CURRENT);
+//   if(!$page) die('// No such page or no permissions, please contact support.');
   
   header('Content-Type: application/javascript; charset=UTF-8');
-//   if(!$page) die('// No such page or no permissions, please contact support.');
   
   
   list($g, $n) = explode('.', $pagename);
@@ -1557,10 +1534,8 @@ function aform_jfile($fname, $data = false) {
     Lock(2);
     file_put_contents($fnamenew, $json);
     
-//     $cmd = "diff -u \"$fname\" \"$fnamenew\"";
     $cmd = "diff -u \"$fname\" \"$fnamenew\" | gzip >> \"$fname.diff.gz\"";
     exec($cmd, $output, $result);
-//     xmp([$cmd, $output, $result]);
     rename($fnamenew, $fname);
     Lock(0);
   }
@@ -1585,7 +1560,6 @@ function mkRefFromId($n) {
 
 $MarkupDirectiveFunctions['listref'] = 'FmtListRef';
 function FmtListRef($pagename, $directive, $args, $content = null) {
-//   xmp($args);
   global $Allegro;
   
   
