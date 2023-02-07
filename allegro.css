@@ -246,10 +246,6 @@ figure.attachment--preview > video + a {
   cursor: default;
 }
 
-/*.trix-content figure.attachment--svg a[href="#"] figcaption.attachment__caption {
-  display: none;
-}*/
-
 
 trix-editor figure.attachment img + figcaption:not(.attachment__caption--edited,.attachment__caption--editing) {
   display: none;
@@ -338,6 +334,7 @@ nav.allegro-subpages li a:hover {
 
 #allegroeditform nav.allegro-subpages {
   display: none;
+  clear: both;
 }
 .sortable-ghost {
   opacity: .5;
@@ -349,6 +346,8 @@ nav.allegro-subpages li a:hover {
   border-radius: 3px;
   padding: 4px 8px;
   margin: 4px 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 #allegroeditform input[name="allegrotitle"] {
@@ -404,6 +403,12 @@ textarea.trix-input--dialog {
 /*   max-width: 600px; */
 }
 
+figure[data-trix-content-type="allegro/math"] {
+  margin: 0;
+  padding: 0;
+  line-height: 1;
+  vertical-align: baseline;
+}
 
 figure[data-trix-content-type="allegro/form"] {
   border-radius: 8px 8px 0 0;
@@ -445,8 +450,36 @@ body {
   display:none;
 }
 
+.allegro-content a.allegro-footnote,
+ol.allegro-reflist .ref-backlinks a,
 ol.footnotes a.backlink {
   text-decoration: none;
+}
+
+.allegro-content a.allegro-footnote:target,
+ol.allegro-reflist li:target {
+  background-color: #ff0;
+}
+
+ol.allegro-reflist:before {
+  content: 'References:';
+  font-weight: bold;
+  width: 50%;
+  display: block;
+  border-top: 1px solid #444;
+}
+ol.allegro-reflist > li {
+  font-size: 90%;
+}
+
+input[data-jets] + ol.allegro-reflist:before,
+h3 + ol.allegro-reflist:before,
+h2 + ol.allegro-reflist:before {
+  display: none;
+}
+
+ol.allegro-reflist + ul {
+  display: none;
 }
 
 .allegro-content a.allegro-ref:target,
@@ -665,15 +698,6 @@ form.allegro-calc div.alert span[data-role="allegroalert"] {
   width: 14em;
 }
 
-
-/*.allegro-calc:hover:before {
-  content: "#" attr(id);
-  color: rgba(0,0,0,.5);
-  position: absolute;
-  top: -1em;
-  right: 0;
-}*/
-
 .allegro-calc textarea:read-only,
 .allegro-calc input[type="number"]:read-only,
 .allegro-calc input[type="text"]:read-only {
@@ -857,14 +881,6 @@ dl.monoterm dt,
   margin-left: .5em;
 }
 
-#allegrodeletebtn {
-  background-color: #fcc;
-/*   float: right; */
-}
-
-#allegrocancelbtn {
-  background-color: #ffc;
-}
 #allegrosavebtn {
   background-color: #cfc;
 }
@@ -957,11 +973,6 @@ nav.allegro-dictindex ul:target {
   text-overflow: ellipsis;
 }
 
-.trix-content ol,
-.trix-content ul {
-/*    list-style-position: inside; */
-}
-
 .trix-content > ol > li,
 .trix-content > ul > li {
    margin-left: 2em;
@@ -1048,4 +1059,8 @@ a[data-jump] {
 time[title] { 
   color: navy;
   border-bottom: 1px dotted navy;
+}
+
+.deletepageform {
+  background-color: #fcc;
 }

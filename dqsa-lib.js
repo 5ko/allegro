@@ -182,14 +182,23 @@ function makeFilterable(el){
   if(el) var lists = [el];
   else var lists = dqsa('ul.filterable,ol.filterable,table.filterable');
   
+  echo({el, lists});
+  
   for(var i=0; i<lists.length; i++) {
     let list = lists[i];
-    
+    if(list.dataset.jets) continue;
     // 1-7 rows/items : no filtering
     var items = (list.tagName == 'TABLE') 
       ? list.querySelectorAll('tr')
       : list.children;
     if(items.length<8) continue;
+    
+    if(list.tagName == 'OL') {
+      for(var j=0; j<items.length; j++) {
+        if(!items[j].getAttribute('value'))
+          items[j].setAttribute('value', j+1);
+      }
+    }
     
     makeFilterableCnt++;
     

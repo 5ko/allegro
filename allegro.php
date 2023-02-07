@@ -1,7 +1,7 @@
 <?php if (!defined('PmWiki')) exit();
 /**
   Allegro: Modular, visual editor for PmWiki
-  Written by (c) Petko Yotov 2017-2022   www.pmwiki.org/Petko
+  Written by (c) Petko Yotov 2017-2023   www.pmwiki.org/Petko
 
   This text is written for PmWiki; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published
@@ -13,16 +13,15 @@
   
   TODO: now:
   * Editor: preview a calc form before inserting it
-  * Printable styles
  
   TODO: Later
   * i18n - UI 
   * Translatable Calculator forms
-  * Tag cloud
   * Documentation
   * Talk/Forum
   
   * Create new namespace mostly done, TODO: update perms
+  * Allegro module: add wikilib.d
   
   MAYBE: later:
   * Make all video covers the same size?
@@ -31,7 +30,7 @@
   * Lazy Image Loading?
   
 */
-$RecipeInfo['Allegro']['Version'] = '20230201';
+$RecipeInfo['Allegro']['Version'] = '20230207';
 
 Markup("allegro", '<&amp;amp;', "/\\(:allegro( .*?)?:\\)\n?(.*?)\n?\\(:allegroend:\\)/is", 'FmtAllegro');
 
@@ -48,6 +47,7 @@ SDVA($HandleActions, array(
   'areview' => 'HandleAllegroReview',
   'atag' => 'HandleAllegroTags',
   'avideocover' => 'HandleAllegroVideoCover',
+  'amath' => 'HandleAllegroUploadMath',
 ));
 
 SDVA($HandleAuth, array(
@@ -63,11 +63,19 @@ SDVA($AllegroData, array( ));
 
 SDVA($Allegro, array(
   'PubDirUrl' => "$ModuleDirUrl/allegro",
-  'PubDirPath' => 'pub/allegro',
   'DisableSkinParts' => 'Left Header Footer Action Title',
   'NextPageNameFmt' => '%s.%04d',
   'DataDir' => "$WorkDir/.allegro",
+  'AnonymousNewPagePat' => '-*',
   'EnableSubpages'=>1,
+  'TagCloud' => [
+    'fmt'=> "<a class='taglink' style=\"font-size:%1.1Fpx;\" title=\"$[%d pages]\" 
+      href=\"{\$PageUrl}?action=atag&amp;t=%s\">%s</a> ",
+    'order'=>'alpha',
+    'log'=>1.3,
+    'count'=>-1,
+    'min' => 1,
+  ],
   'allegro2wiki' =>[ '`' => '&#96;', '´' => '&#180;'],
   'allegro2wiki2' =>[ 
     '<h2>'  => '`!', '</h2>' => '!´',
@@ -530,10 +538,10 @@ function FmtAllegroLst($g, $names, $data, $args, $defaultcname, $defaultlabel) {
   $out = '';
   foreach($names as $nn) {
     if(!@$data[$nn]) continue;
-    if(preg_match('/^Template/', $nn)) continue;
+    if($defaultcname != 'allegro-templates' &&  preg_match('/^Template/', $nn)) continue;
     $nt = $data[$nn]['title'] ?? $nn;
     $status = $data[$nn]['status'] ?? 'draft';
-    $ntt = Keep ($nt);
+    $ntt = Keep($nt);
     $out .= "* [[ $g.$nn\"$ntt\" | $nt ]] \n";
   } 
   if($out) {
@@ -614,6 +622,16 @@ function FmtAllegroLinks($m) {
   if($args['mode'] == 'templates') {
     $tplnames = preg_grep('/^Template/', array_keys($data));
     if(!$tplnames) return '';
+    $lasttemplate = 0;
+    $sorted = [];
+    foreach($tplnames as $v) {
+      $currtemplate = intval(substr($v, 8));
+      $lasttemplate = max($lasttemplate, $currtemplate);
+      $sorted[$v] = $data[$v]['title'];
+    }
+    asort($sorted);
+    $tplnames = array_keys($sorted);
+    
     $out = '';
     foreach($tplnames as $nn) {
       $page = RetrieveAuthPage("$g.$nn", "read", true, READPAGE_CURRENT);
@@ -632,6 +650,26 @@ function FmtAllegroLinks($m) {
       return Keep("<select id='allegrotemplate'><option>$label</option>$out</select>");
     }
     return '';
+  }
+  if($args['mode'] == 'listtemplates') {
+    $tplnames = preg_grep('/^Template/', array_keys($data));
+    
+    $defaultlabel = '$[Templates]';
+    $label = $args['label'] ?? $defaultlabel;
+    $lasttemplate = 0;
+    $sorted = [];
+    foreach($tplnames as $v) {
+      $currtemplate = intval(substr($v, 8));
+      $lasttemplate = max($lasttemplate, $currtemplate);
+      $sorted[$v] = $data[$v]['title'];
+    }
+    asort($sorted);
+    $tplnames = array_keys($sorted);
+    
+    $nexttemplate = "Template".(++$lasttemplate);
+    $label .= "\n* [[$g.$nexttemplate?action=aedit| $[Add new template] ]] %list filterable% \n";
+    
+    return FmtAllegroLst($g, $tplnames, $data, $args, 'allegro-templates', $label);
   }
   if($args['mode'] == 'select') {
     if(!$Allegro['EnableSubpages']) return '';
@@ -707,6 +745,53 @@ function FmtAllegroLinks($m) {
       return FmtAllegroLst($g, $sorted, $data, $args, 'allegro-tags', $label);
     else return $label;
   }
+  if($args['mode'] == 'tagcloud') {
+    $hpn = MakePageName("$g.$g", "$g.");
+    
+    $fmt = FmtPageName($Allegro['TagCloud']['fmt'], $hpn);
+  
+    $alltags = $alltagspages = [];
+    foreach($data as $pn=>$a) {
+      if(!isset($a['tags'])) continue;
+      foreach($a['tags'] as $t) {
+        @$alltags[$t]++;
+        @$alltagspages[$t][] = $pn;
+      }
+    }
+    if(!count($alltags)) return '';
+      
+    SDVA($args, $Allegro['TagCloud']);
+
+    $order = $args['order'];
+    $min = intval($args['min']);
+    $count = intval($args['count']);
+    
+    $base = floatval($args['log']);
+      
+    if($order[0]==='-') {
+      $reverse = 1;
+      $order = substr($order, 1);
+    }
+    else $reverse = 0;
+      
+    if($order == 'locale' || $order == 'alpha')
+      ksort($alltags, SORT_LOCALE_STRING);
+    
+    elseif($order == 'hits') 
+      arsort($alltags, SORT_NUMERIC);
+    
+    if($reverse) $alltags = array_reverse($alltags, true);
+    
+    $output = '';
+    $i = 0;
+    foreach ($alltags as $k => $v){
+      if($v<$min) continue;
+      $w = $base>1? log($v, $base) : $v;
+      $output .= sprintf($fmt, $w+10, $v, rawurlencode($k), $k);
+      if($count>0 && ++$i>=$count) break;
+    }
+    return Keep($output);
+  }
   
   
 }
@@ -732,7 +817,8 @@ function AllegroTreeList($g, $tree, $level=0) {
 function AllegroParentSelect($tree, $currentpage=null, $level=0) {
   $label = PHSC($tree['title']);
   $nn = $tree['pn'];
-  if($nn == $currentpage) { # group homepage
+  if($nn == $currentpage||preg_match('/^Template/', $nn)) { 
+    # group homepage or template
     return '';
   }
   $indent = str_repeat('&nbsp;&nbsp;&nbsp;', $level);
@@ -791,7 +877,7 @@ function HandleAllegroTags($pagename, $auth = 'read') {
 
 function HandleAllegroUpload($pagename, $auth = 'upload') {
   global $FmtV, $UploadRedirectFunction;
-  $page = RetrieveAuthPage($pagename, $auth, false, READPAGE_CURRENT);
+  $page = AllegroRetrieveNewPage($pagename, $auth, false, READPAGE_CURRENT);
   if(!$page) {
     $FmtV['$upresult'] = 'upresult=permissions';
     return AllegroUploadRedirect($pagename);
@@ -827,14 +913,68 @@ function AllegroUploadRedirect($pagename, $url=false) {
       $out['attr']['contentType'] = $ctype;
       $out['attr']['caption'] = $FmtV['$upname'];
     }
-  }
-//   $out['FmtV'] = $FmtV; 
+  } 
   echo AllegroJE($out);
-  
 }
 
 function HandleAllegroNew(&$pagename, $auth = 'edit') {
 }
+
+
+function AllegroRetrieveNewPage($pagename, $auth, $authprompt=true, $since=0) {
+  global $Allegro, $AuthId, $AuthList;
+  $m = MatchPageNames($pagename, $Allegro['AnonymousNewPagePat'], false);
+  
+  if($AuthId || !$m || PageExists($pagename)) 
+    return RetrieveAuthPage($pagename, $auth, true, $since);
+  
+  # new page
+  $page = ReadPage($pagename, $since);
+  
+  $page['passwdedit'] = "id:* ". AnonUserSetPagePerms($pagename);
+  
+  return $page;
+}
+
+# This function enables edit permissions for anonymous users's own pages
+function AnonUserSetPagePerms($pagename = null) {
+  global $AuthId, $Allegro, $AuthList, $Now;
+
+  $user_id0 = $user_id = @$_COOKIE['known_user'];
+  if($AuthId || (!$pagename && !$user_id)) return;
+  
+  $fname = "{$Allegro['DataDir']}/_AnonUsersPerms.json";
+  $users = AllegroJD('{}', $fname);
+  if(!$user_id) {
+    $user_id = base64_encode(random_bytes(15));  
+  }
+  if(! isset($users[$user_id])) $users[$user_id] = array();
+  if($pagename) {
+    $perms = str_replace(".", "_", "@edit_$pagename");
+    $users[$user_id][] = $perms;
+  }
+  $users[$user_id] = array_unique($users[$user_id]);
+  pm_session_start();
+  foreach($users[$user_id] as $k=>$pageauth) {
+    if(is_integer($pageauth)) continue;
+    $AuthList[$pageauth] = 1;
+    $_SESSION['authlist'][$pageauth] = 1;
+  }
+  $users[$user_id]['=expires'] = $Now+30*86400;
+  
+  pmsetcookie('known_user', $user_id, $Now+30*86400, "/");
+  
+  foreach($users as $uid=>$a) {
+    if($a['=expires']<$Now) unset($users[$uid]);
+  }
+  
+  if(!$pagename) return;
+  AllegroJE($users, $fname);
+  return $perms;
+}
+@$LogoutCookies[] = 'known_user';
+AnonUserSetPagePerms();
+
 
 function HandleAllegroEdit(&$pagename, $auth = 'edit') {
   global $UploadMaxSize, $XL, $Allegro, $AllegroData, $Now, $PageStartFmt,
@@ -852,17 +992,19 @@ function HandleAllegroEdit(&$pagename, $auth = 'edit') {
   pm_session_start();
   
   if(isset($_POST['allegrotext'])) {
-    $page = RetrieveAuthPage($pagename, $auth, true);
+    $page = AllegroRetrieveNewPage($pagename, $auth, true);
     $posted = 1;
   }
   else {
-    $page = RetrieveAuthPage($pagename, $auth, true, READPAGE_CURRENT);
+    $page = AllegroRetrieveNewPage($pagename, $auth, true, READPAGE_CURRENT);
     $posted = 0;
   }
   if(!$page) {
     unset($_SESSION['AllegroEdit']);
     return Abort('? $[No permissions]');
   }
+  
+  $canupload = CondAuth($pagename, 'upload');
   
   
   $_SESSION['AllegroEdit'][$g] = 1;
@@ -956,6 +1098,7 @@ function HandleAllegroEdit(&$pagename, $auth = 'edit') {
     $new["csum"] = $new["csum:$Now"] = $ChangeSummary;
     Lock(2);
     UpdatePage($pagename, $page, $new);
+    AnonUserSetPagePerms($pagename);
 //     if(0 && @$_POST['delattach']) {
 //       // instead, get and update the list of attachments for this page
 //       $dlist = explode(' ', $_POST['delattach']);
@@ -980,11 +1123,11 @@ function HandleAllegroEdit(&$pagename, $auth = 'edit') {
   $InputValues['allegroh1'] = @$args['h1'] ? $args['h1'] : '';
   $InputValues['allegroh2'] = @$args['h2'] ? $args['h2'] : '';
   
-  $InputValues['allegrotitle'] = $isnew ? "" : PageVar($pagename, '$Title');
+  $InputValues['allegrotitle'] = PageExists($pagename) ? PageVar($pagename, '$Title') : "";
   $InputValues['author'] = $Author;
   $InputValues['authid'] = $AuthId;
   
-  
+  $XL['en']['ULnopermissions'] = 'No upload permissions, please create an account to attach files.';
   $codes = array();
   foreach($XL['en'] as $k=>$v) {
     if(! preg_match('!^(UL|W_|A_)!', $k)) continue;
@@ -1004,6 +1147,7 @@ function HandleAllegroEdit(&$pagename, $auth = 'edit') {
     'UploadMaxSize' => $UploadMaxSize,
     'UploadExts' => array_keys($UploadExts),
     'XL' => $codes,
+    'canupload' => $canupload,
   );
   
   $forms = ListPages('Forms.*,-*.Forms,-*.GroupFooter,-*.GroupHeader,-*.GroupAttributes,-*.RecentChanges,-*.PageNotFound,-*.Documentation*');
@@ -1098,6 +1242,7 @@ function figure2wiki($m){
   global $pagename;
   list($g, $n) = explode('.', $pagename);
   
+  
   $m[1] = preg_replace('!\\s+!', ' ', $m[1]);
   $args = ParseArgs($m[1], '(?>(\\w[-\\w]*)[=])');
   
@@ -1186,7 +1331,7 @@ function link2wiki($m) {
   $href = trim($attrs['href']);
   if(preg_match('/^javascript:/i', $href)) return '';
   
-  $content = trim($m[2]);
+  $content = ltrim($m[2]);
   if($content != $href) $content2 = " | $content";
   else $content2 = '';
   
@@ -1200,13 +1345,13 @@ function link2wiki($m) {
     else $href = $mm[1] . '/' .$mm[2];
     $href = preg_replace('!^Profiles/!', '~', $href);
   }
-  
+  $tag = false;
   if(preg_match('!^Tag:(.*)!', $href, $mm)) {
-    $tag = html_entity_decode($mm[1]);
+    $tag = trim(html_entity_decode($mm[1]));
     if($tag == $content) {
-      $out = "[[!$content]]";
+      $out = "[[!$tag]]";
     }
-    else $out = "[[!$tag | $content]]";
+    else $out = "[[!$tag|$content]]";
   }
   else {
     $out = "[[$href$content2]]";
@@ -1259,7 +1404,13 @@ function wikifigure2html($a) {
   $img = $caption = $content = $ext = $ecaption = '';
   if(@$a['filename'])
     $ext = preg_replace('!^.*\\.!', '', $a['filename']);
-  if(@$a['width'] && @$a['height']) { # picture
+    
+  if(@$a['content']) {
+    $b['frozen'] = true;
+    $cname = 'content';
+    $content = $a['content'];
+  }
+  elseif(@$a['width'] && @$a['height']) { # picture
     $b['presentation'] = 'gallery';
     if(@$a['caption']) {
       $b['caption'] = $a['caption'];
@@ -1273,11 +1424,6 @@ function wikifigure2html($a) {
   elseif(@$a['filename']) { # other attachment, office, pdf
     $cname = "file attachment-file--$ext";
     if(!@$a['caption']) $a['caption'] = $a['filename'];
-  }
-  elseif(@$a['content']) {
-    $b['frozen'] = true;
-    $cname = 'content';
-    $content = $a['content'];
   }
   if(@$a['caption']) {
     $ec = PHSC($a['caption']);
@@ -1303,6 +1449,7 @@ function wikifigure2html($a) {
 function wikiattach2html($m, $pagename) {
   global $Allegro, $UploadExts, $FmtV;
   @list($markup, $imap, $w, $h, $fname, $input, $caption) = $m;
+
   if(@$input) {
     $input = MarkupRestore($input);
     $input = preg_replace('/^\\[=|=\\]$/', '', $input);
@@ -1316,9 +1463,13 @@ function wikiattach2html($m, $pagename) {
   
   $a = $b = [];
   if($imap == 'Math') {
-    $a['filename'] = "math--$fname.svg";
+    $a['filename'] = 
+    $fname = "math--$fname.svg";
     $a['input'] = $input;
-    $a['href'] = "";
+    $url = DownloadUrl($pagename, $fname);
+    $a['contentType'] = "allegro/math";
+    $a['content'] = "<img src=\"$url\" />";
+    return wikifigure2html($a);
   }
   elseif($imap == 'Youtube') {
     $a['href'] = "https://youtu.be/$fname";
@@ -1372,9 +1523,9 @@ function wikitag2html($m) {
     return wikifigure2html($a);
   }
   
-  $text = $m[3]?? $tag;
+  $text = ltrim($m[3]?? $tag);
   $rtag = PHSC($tag);
-  return "<a href=\"Tag:$rtag\">$tag</a>";
+  return "<a href=\"Tag:$rtag\">$text</a>";
 }
 
 
@@ -1418,7 +1569,7 @@ function wiki2html($pagename, $in, $edit=false) {
   $out = strip_tags($out);
   $out = MarkupRestore($out);
   $out = PRCB(
-    '!\\[\\[(Attach|Youtube|Vimeo|Math|Video)(?:(\\d+)x(\\d+))?:(.*?)(?:"(.*?)")?(?:\\|(.*?))?\\]\\]!',
+    '!\\[\\[(Attach|Youtube|Vimeo|Math|Video)(?:(\\d+)x(\\d+))?:(.*?)(?:"(.*?)")?(?:\\|(.*?))?\\]\\]!s',
     'wikiattach2html', $out, $pagename);
     
   $out = PRCB('/\\[\\[(!|%|~)(.*?)(?:\\|(.*?))?\\]\\]/s', 'wikitag2html', $out);
@@ -1472,8 +1623,6 @@ function AllegroFormSaveTranslations($pagename, $page, $new) {
 $HandleActions['libcalc'] = 'HandleLibCalc';
 function HandleLibCalc($pagename, $auth='read') {
   global $Allegro;
-//   $page = RetrieveAuthPage($pagename, $auth, false, READPAGE_CURRENT);
-//   if(!$page) die('// No such page or no permissions, please contact support.');
   
   header('Content-Type: application/javascript; charset=UTF-8');
   
@@ -1485,9 +1634,9 @@ function HandleLibCalc($pagename, $auth='read') {
   
   
   $listglob = FixGlob($listglob, '$1Forms.$2');
+
   
   $list = ListPages($listglob);
-  
   
   $inputrx = [
     '/^#.*$/m' => '',
@@ -1727,18 +1876,30 @@ function HandleAllegroReview($pagename, $auth = 'attr') {
 }
 
 function HandleAllegroDelete($pagename, $auth = 'attr') {
-// ! hassubpages
-
+  global $IsPagePosted, $EnableRedirect, $WikiDir, $AllegroData;
   $page = RetrieveAuthPage($pagename, $auth, true, READPAGE_CURRENT);
   if(!$page) return Abort('?No permissions');
-  $parent = MakePageName($pagename, "$g." . @$AllegroData[$g][$n]['parent']);
+  if(!@$_POST['confirm'] || !@$_POST['csum']) 
+    return Abort('?Invalid request');
+  if(AllegroCondSubpages($pagename))
+    return Abort('?Cannot delete page with subpages');
+  
+  list($g, $n) = explode('.', $pagename);
+  AllegroData($g);
+  
+  $parent = MakePageName($pagename, "$g." . strval(@$AllegroData[$g][$n]['parent']));
   $WikiDir->delete($pagename);
   unset($AllegroData[$g][$n]);
   AllegroData($g, true);
+  $IsPagePosted = true;
+  PostRecentChanges($pagename,$page,$page);
   return Redirect($parent);
 }
 
-// $DiffHTMLFunction = 'AllegroDiff';
+$PageDiffFmt = array(
+  "wiki:Site.DeletePageForm",
+  "<h2 class='wikiaction'>$[{\$FullName} History]</h2>",
+);
 $DiffRenderSourceFunction = 'AllegroDiffRenderSource';
 $DiffPrepareInlineFunction = 'AllegroDiffPrepare';
 function AllegroDiffRenderSource($in, $out, $which) {
@@ -1801,7 +1962,35 @@ function FmtAllegroForm($pagename, $directive, $args, $content = null) {
   
 }
 
-# TODO: Check if there is really such a link in pages.
+
+function HandleAllegroUploadMath($pagename, $auth) {
+  global $UploadFileFmt, $FmtV, $Now;
+  pm_session_start();
+  $page = AllegroRetrieveNewPage($pagename, $auth, true, READPAGE_CURRENT);
+  header("Content-Type: application/json");
+  if(!$page) {
+    echo AllegroJE(array('failure'=>'No permissions'));
+    exit;
+  }
+  $randstamp = base_convert($Now, 10, 36) . base_convert(mt_rand(36,1295), 10, 36);
+  $randstamp = preg_replace('/(p|c)(hp|l|gi)/', '$1x$2', $randstamp);
+  $upname = "math--$randstamp.svg";
+  $filepath = FmtPageName("$UploadFileFmt/$upname", $pagename);
+  $svg = trim(strval(@$_POST['svg']));
+  
+  if(preg_match('!^<svg .*?</svg>$!s', $svg)) {
+    file_put_contents($filepath, $svg);
+    clearstatcache();
+    $url = DownloadUrl($pagename, $upname);
+    echo AllegroJE(array('url'=>$url, 'upname'=>$upname));
+  }
+  else {
+    echo AllegroJE(array('failure'=>"Error"));
+  }
+  exit;
+}
+
+
 function HandleAllegroVideoCover($pagename, $auth) {
   global $Allegro, $UploadFileFmt;
   $img = strval(@$_REQUEST['upname']);
@@ -1809,7 +1998,8 @@ function HandleAllegroVideoCover($pagename, $auth) {
     header("Location: {$Allegro['PubDirUrl']}/video-bg.webp");
     exit;
   }
-  $page = RetrieveAuthPage($pagename, $auth, true, READPAGE_CURRENT);
+  pm_session_start();
+  $page = AllegroRetrieveNewPage($pagename, $auth, true, READPAGE_CURRENT);
   if(!$page) {
     header("Location: {$Allegro['PubDirUrl']}/video-bg.webp");
     exit;

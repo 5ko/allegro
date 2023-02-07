@@ -9,12 +9,10 @@
   and lack of warranty.
 */
 
-// TODO: alert/confirm softbox
-
 var Allegro = {};
 
 // This would only be used if enabled
-window.MathJax = { 
+window.MathJax = {
   options: {
     enableMenu: false 
   },
@@ -33,7 +31,6 @@ function targetBlank(e) {
 // TODO; i18n for the markup
 function maketables() {
   function makesimpletable(ol) {
-    echo({table:ol})
     var out = '', out2 = '';
     var rows = ol.children;
     var el = document.createElement('span');
@@ -77,7 +74,7 @@ function maketables() {
     if(!out2) return;
     out2 = out2.replace(/^(\s*<tr>[\s\S]*?<\/tr>)([\s\S]*)$/, '<thead>$1</thead><tbody>$2</tbody>');
     var tclass = "simpletable";
-    var a = rows[0].textContent.match(/^\s*\[TAB\]\s*(.*?)$/);
+    var a = rows[0].textContent.match(/^\s*\[(?:TAB|TABLE|TABELLE)\]\s*(.*?)$/);
     if(a) {
       var b = a[1].match(/\.([-.\w]+)/);
       if(b) tclass += ' ' + b[1].split(/\./g).join(' ');
@@ -86,7 +83,6 @@ function maketables() {
     if(rows.length>8) tclass += " filterable";
     if(rows.length>4 && !tclass.match(/nosort/)) tclass += " sortable";
     out = '<div class="allegrotablewrap"><table class="'+tclass+'">\n'+out2+'</table></div>\n';
-//     echo(out)
     adjae(ol, out);
     var newtable = ol.nextSibling.firstChild;
     var thead = newtable.querySelector('thead')
@@ -99,7 +95,6 @@ function maketables() {
   }
   
   var ul_items = dqsa('.allegro-content > ul > li:first-child, .allegro-content details > ul > li:first-child');
-//   echo({ul_items});
   for(var i=0; i<ul_items.length; i++) {
     var tc = ul_items[i].textContent
     if(tc.match(/^\s*\[TAB\]\s*(.*?)$/)) makesimpletable(ul_items[i].parentNode);
@@ -349,6 +344,11 @@ function SubmitDeletedFormulas() {
 }
 
 document.addEventListener("trix-file-accept", function(e){
+  if(!Allegro.canupload) {
+    e.preventDefault();
+    showInfo(Allegro.XL.ULnopermissions);
+    return;
+  }
   var file = e.file;
   
   var ext = file.name.replace(/^.*\./, '');
@@ -356,14 +356,14 @@ document.addEventListener("trix-file-accept", function(e){
   // message when file is unsupported or too large
   if(Allegro.UploadExts.indexOf(ext)<0) {
     e.preventDefault();
-    alert(Allegro.XL.ULbadtype.replace(/\$upext/g, ext));
+    showInfo(Allegro.XL.ULbadtype.replace(/\$upext/g, ext));
     return;
   }
     
     
    if(file.size > Allegro.UploadMaxSize) {
     e.preventDefault();
-    alert(Allegro.XL.ULtoobig);
+    showInfo(Allegro.XL.ULtoobig);
     return;
   }
   
@@ -460,6 +460,7 @@ document.addEventListener('trix-before-initialize', function(){
   var vars = dqs('#allegrovars');
   try {
     Allegro = JSON.parse(vars.value);
+    Allegro.Form = vars.form;
   }
   catch(e) {
     console.error("Could not parse Allegro variables, exiting.");
@@ -548,6 +549,11 @@ document.addEventListener('trix-before-initialize', function(){
 
 });
 
+function showInfo(message) {
+  var dialog = dqs('[data-trix-dialog="x-info"]');
+  dialog.querySelector('.trix-dialog-title').textContent = message;
+  dialog.dataset.trixActive = 1;
+}
 
 
 document.addEventListener('trix-initialize', function(){
@@ -555,12 +561,8 @@ document.addEventListener('trix-initialize', function(){
   dbg('trix-initialize');
   
   
-  var vars = dqs('#allegrovars');
-//   Allegro = JSON.parse(vars.value);
-  Allegro.Form = vars.form;
-  
   aE([Allegro.Form], 'submit', function(e) {
-    SubmitDeletedFormulas(e);
+//     SubmitDeletedFormulas(e);
     Allegro.NsMessage = '';
   });
   
@@ -581,7 +583,6 @@ document.addEventListener('trix-initialize', function(){
         || el.name == 'csum'
         || el.value === el.initialValue) continue;
       changed++;
-      echo({i:el.initialValue, v: el.value, zel: el});
     }
     
     if(changed) {
@@ -605,13 +606,15 @@ document.addEventListener('trix-initialize', function(){
   
   
   aE('trix-editor', 'dblclick', function(e){
-    var curratt = editor.composition.getAttachmentAtRange(editor.getSelectedRange());
+    var range = editor.getSelectedRange();
+    var curratt = editor.composition.getAttachmentAtRange(range);
     if(curratt) {
       att = curratt.attributes.values;
       dbg(att);
       if(att.input) {
         var dialog = dqs('[data-trix-dialog="math"]');
         var input = dialog.querySelector('textarea');
+        input.dataset.range = range.join(',');
         var preview = dialog.querySelector('.mathPreview');
         input.value = att.input;
         previewMath('input', input, preview);
@@ -619,8 +622,6 @@ document.addEventListener('trix-initialize', function(){
       }
       else if(att.filename && att.filename.match(/\.mp4(\.jpg(\\?r=\\d+)?)?$/)) {
         var src = att.href.replace(/\.jpg(\?r=\d+)?$/g, '');
-//         echo(src);
-//         https://wiki.audio/uploads/En/test.mp4.jpg?r=358476
         
         dqs('.trix-dialog--videocover').dataset.trixActive = 1;
         var html = '<video src="' + src + '" controls></video>';
@@ -639,6 +640,7 @@ document.addEventListener('trix-initialize', function(){
     }
     
   });
+  
   
   filebuttons.parentNode.insertBefore(filebuttons, blockbuttons);
   
@@ -663,7 +665,7 @@ document.addEventListener('trix-initialize', function(){
     }
     return el;
   }
-  function mkdialog(obj) {    
+  function mkdialog(obj) {
     var el = document.createElement('div');
     if(obj.id) el.id = obj.id;
     el.className = 'trix-dialog';
@@ -748,18 +750,21 @@ document.addEventListener('trix-initialize', function(){
       input.className = 'trix-input trix-input--dialog';
       controls.appendChild(input);
       
-      input.addEventListener('input', function(e){
-        if(input.value.trim() === '') {
-          if(preview) preview.innerHTML = '';
-        }
-        else fn('input', input, preview);
-      });
-      input.addEventListener('paste', function(e){
-        setTimeout(function(){
-          fn('paste', input, preview);
-        }, 50);
-      });
+      if(fn) {
+        input.addEventListener('input', function(e){
+          if(input.value.trim() === '') {
+            if(preview) preview.innerHTML = '';
+          }
+          else fn('input', input, preview);
+        });
+        input.addEventListener('paste', function(e){
+          setTimeout(function(){
+            fn('paste', input, preview);
+          }, 50);
+        });
+      }
     }
+    
     
     var controls2 =  mkdiv("trix-button-group");
     controls.appendChild(controls2);
@@ -780,7 +785,7 @@ document.addEventListener('trix-initialize', function(){
       controls2.appendChild(b);
       
       b.addEventListener('click', function(e){
-        var role = this.dataset.role, value = input.value;
+        var role = this.dataset.role, value = input? input.value : null;
         
         if(!value && role.match(/^(preview|embed)$/) && attr!='ref') {
           e.preventDefault();
@@ -790,20 +795,25 @@ document.addEventListener('trix-initialize', function(){
         }
       
         if(role.match(/^(cancel|clear)$/)) {
-          input.value = '';
+          if(input) input.value = '';
           if(preview) preview.innerHTML = '';
         }
-        else 
+        else if (fn)
           fn(role, input, preview);
         
         if(role=='embed') {
-          input.value = '';
+          if(input) input.value = '';
           if(preview) preview.innerHTML = '';          
         }
       });
     }
     
   }
+  
+//   mknewdialog(attr, label,    title,     input, buttons, fn, note, preview);
+  mknewdialog('x-info', false, 'message', false, ['close:Close']);
+
+
   
   function embedbtn(obj) {
     var el = mkbtn(obj);
@@ -814,7 +824,6 @@ document.addEventListener('trix-initialize', function(){
     id: 'allegroembedmenu', cname: 'embed', attr: 'x-embed', 
     title: '<b>Embed in page:</b>', html: ' ' 
   });
-  
   
   var videorx = [
     [/^https?:\/\/youtu\.be\/([^&?]+)([&?].*)?$/i, 'youtube--$1.jpg', 'https://youtu.be/$1', 'https://www.youtube.com/oembed?url='],
@@ -902,8 +911,6 @@ document.addEventListener('trix-initialize', function(){
     }, 50);
     editor.selectionManager.unlock();
   }
-//   tap('trix-editor', closedialogs);
-  
   
   function previewMath(role, input, preview) {
     if(role=='paste') return; // already in "input"
@@ -919,11 +926,32 @@ document.addEventListener('trix-initialize', function(){
       preview.appendChild(svg);
     }
     else { // embed
-      var d = new Date();
-      var fname = "math--" + Date.now().toString(36) + '.svg';
-      var file = new File([new Blob([svg.outerHTML])], fname, {type: 'image/svg+xml'});
-      file.input = text;
-      editor.insertFile(file); // delegated to trix-attachment-add
+      
+      var data = {
+        n: Allegro.FullName,
+        action: 'amath',
+        svg: svg.outerHTML
+      };
+      
+      var url = Allegro.PageUrl + "?action=amath";
+      
+      fe4p('json', url, data, function(x){
+        if(x.url) {
+          var att = { 
+            content: '<img src="'+x.url+'" />',
+            contentType: 'allegro/math',
+            filename: x.upname,
+            input: text
+          };
+          if(input.dataset.range) {
+            editor.setSelectedRange(input.dataset.range.split(/,/).map(parseFloat));
+            editor.deleteInDirection("forward");
+          }
+          var attachment = new Trix.Attachment(att);
+          editor.insertAttachment(attachment);
+          input.dataset.range = '';
+        }
+      });
     }
   }
   
@@ -951,8 +979,6 @@ document.addEventListener('trix-initialize', function(){
   function setVideoCover(role, input, preview) {
     var video = preview.querySelector('video');
     if(!video) return;
-//     echo({role, input, preview, video});
-//     return;
     
     var allatt = dqs('trix-editor').editor.composition.getAttachments();
     var attachment = false;
@@ -995,7 +1021,6 @@ document.addEventListener('trix-initialize', function(){
           var wikiresp = x.resp;
           var nurl = cfile.url.replace(/\?r=.*$/, '') + '?r=' + rint(100000, 999999);
           var range = editor.getDocument().getRangeOfAttachment(attachment);
-//           echo(attachment);
           var caption = attachment.previewDelegate.attachmentPiece.attributes.values.caption;
           cfile.url = nurl;
           cfile.width = cw;
@@ -1141,7 +1166,9 @@ document.addEventListener('trix-initialize', function(){
     simplebtn(blockbuttons, 'heading1', 'Heading 1', 'H1', 1);
   }
   
-  var el = simplebtn(filebuttons, 'x-embed', 'Embed files, formulas, videos', '&nbsp;➕&nbsp;');
+//   var el = 
+  simplebtn(filebuttons, 'x-embed', 'Embed calculators, formulas, videos', '&nbsp;➕&nbsp;');
+  if(!Allegro.canupload) dqs('.trix-button[data-trix-action="attachFiles"]').style.display = 'none';
   
   
   mknewdialog('v2', 'Video from YouTube or Vimeo', 
@@ -1188,17 +1215,17 @@ document.addEventListener('trix-initialize', function(){
     editor.insertAttachment(attachment);
   }
   
-  //   attr, label, title, input, buttons, fn, note, preview
-  mknewdialog('ref', 'Footnote or bibliographic reference', 
-              'Insert a footnote or a bibliographic reference:', 'area:Type footnote or additon to the selected reference (optional)', 
-              ['embed:Embed', 'cancel:Cancel'], //'preview:Preview', 
-              embedRef, "Note: You need to first <a href='/Bibliography' target='_blank'>create a bibliographic entry</a> before it appears in the list above.", false);
-  
-  var refc = dqs('.trix-dialog--ref .trix-dialog-content');
-  var reflist = dqs('div.allegroedit ul.bibliolist');
-  if(refc && reflist) {
-    refc.parentNode.insertBefore(reflist, refc);
-  }
+//  //   attr, label, title, input, buttons, fn, note, preview
+//   mknewdialog('ref', 'Footnote or bibliographic reference', 
+//               'Insert a footnote or a bibliographic reference:', 'area:Type footnote or additon to the selected reference (optional)', 
+//               ['embed:Embed', 'cancel:Cancel'], //'preview:Preview', 
+//               embedRef, "Note: You need to first <a href='/Bibliography' target='_blank'>create a bibliographic entry</a> before it appears in the list above.", false);
+//   
+//   var refc = dqs('.trix-dialog--ref .trix-dialog-content');
+//   var reflist = dqs('div.allegroedit ul.bibliolist');
+//   if(refc && reflist) {
+//     refc.parentNode.insertBefore(reflist, refc);
+//   }
   
   
   
@@ -1217,17 +1244,19 @@ document.addEventListener('trix-initialize', function(){
   adjae(forminput, dl);
   sa(forminput, 'list', 'formKeys');
   
-  
-  var p = dqs('.trix-dialog--link'), ltp = dqs('#linktopage');
-  if(p && ltp) {
-    p.appendChild(ltp);
-    tap('#linktopage a', linkToPage);
+  function locallinks() {
+    var p = dqs('.trix-dialog--link'), ltp = dqs('#linktopage');
+    if(p && ltp) {
+      clearInterval(ltpInterval);
+      p.appendChild(ltp);
+      tap('#linktopage a', linkToPage);
+    }
   }
+  var ltpInterval = setInterval(locallinks, 200);
+  
   tap('#allegroeditform nav.allegro-subpages a', function(e){
     e.preventDefault();
   });
-  
-  
   var spages = dqsa('#allegroeditform nav.allegro-subpages > ul > li');
   if(spages.length>1) {
     new Sortable(spages[0].parentNode, {
@@ -1260,26 +1289,11 @@ document.addEventListener('trix-initialize', function(){
     
   });
   
-  tap('#allegrodelete', function(e){
-    if(!confirm(this.dataset.msg)) {
-      e.preventDefault();
-      e.stopPropagation();
-      return false;
-    }
-    else return true;
-  });
-  
-  
-  aE([vars.form], 'submit', );
-  
-  function notsavedwarning(){
-    
-    
-  }
 
+  
 }); // 'trix-initialize'
 
-function makereferences() {
+function makereferences() { // DEPRECATED
   var refs = dqsa('.allegro-content figure[data-trix-content-type="allegro/ref"]');
   if(!refs.length) return;
   
@@ -1310,6 +1324,85 @@ function makereferences() {
   }
 }
 
+var ReferenceCount = 0;
+var ReferenceList = {};
+function makesectionreferences(ul) {
+  var cnt = ul.children.length;
+  var ol = "<ol class='allegro-reflist filterable'>";
+  for(var i=1; i<cnt; i++) {
+    ReferenceCount++;
+    var item = ul.children[i];
+    var tc = item.textContent.trim();
+    var ih = item.innerHTML;
+    var a = tc.match(/^\[[- \w\p{Letter}]+\]/u);
+    var key = '';
+    if(a) {
+      ih = ih.replace(a[0], '');
+      key = a[0];
+    }
+    else {
+      a = tc.match(/^[-\w\p{Letter}]+/u);
+      key = '['+a[0]+']';
+    }
+    if(key) ReferenceList[key] = ReferenceCount;
+    
+    ol += "<li value='"+ReferenceCount+"' id='cite-note-"+ReferenceCount+"'>"
+      + '<span class="ref-backlinks"></span> '
+      + ih
+      +"</li>";
+  }
+  ol+= '</ol>'
+  adjbb(ul, ol);
+  makeFilterable(ul.previousSibling);
+}
+function makepagereferences() {
+  var firstchildren = dqsa('.allegro-content > ul > li:first-child');
+  for(var i=0; i<firstchildren.length; i++) {
+    if(firstchildren[i].textContent.trim().match(/^\[REF(LISTE?)?\]/))
+       makesectionreferences(firstchildren[i].parentNode);
+  }
+  var sups = dqsa('.allegro-content sup');
+  for(var i=0; i<sups.length; i++) {
+    var j = i+1;
+    var item = sups[i];
+    var tc = item.textContent.trim();
+    var a = tc.match(/^\[[- \w\p{Letter}]+\]/u);
+    if(!a) continue;
+    if(!ReferenceList.hasOwnProperty(a[0])) continue;
+    
+    var ih = item.innerHTML;
+    var rid = ReferenceList[a[0]];
+    item.innerHTML = ih.replace(a[0], 
+      '<a id="ref-note-'+j+'" class="allegro-footnote" href="#cite-note-'+rid+'">['+rid+']</a>');
+    
+    adjae(item, '<div class="allegro-ref-wrap"><div class="allegro-ref-content"></div></div>');
+    var div = item.nextElementSibling;
+    var divcontent = div.lastChild;
+    div.insertBefore(item, divcontent);
+    var refitem = dqs('#cite-note-'+rid);
+    divcontent.innerHTML = refitem.innerHTML.replace(/^<span [^>]*ref-backlinks.*?<\/span>\s*/, '');
+    
+    var backspan = dqs('#cite-note-'+rid+' .ref-backlinks');
+    adjbe(backspan, '<a href="#ref-note-'+j+'">^</a>');
+    
+  }
+  var backspans = dqsa('.ref-backlinks');
+  for(var i=0; i<backspans.length; i++) {
+    var bs = backspans[i];
+    var lx = bs.querySelectorAll('a');
+    if(lx.length<2) continue;
+    var out = [];
+    
+    for(var j=0; j<lx.length; j++) {
+      lx[j].textContent = (j+10).toString(36);
+      out.push(lx[j].outerHTML);
+    }
+    
+    out = "^ <sup>" +out.join(', ')+ "</sup>";
+    bs.innerHTML = out;
+  }
+}
+
 
 function refhover(e) {
   var rect = this.getBoundingClientRect();
@@ -1318,9 +1411,7 @@ function refhover(e) {
   var doc = document.body.getBoundingClientRect();
   
   var bw = doc.width, al = rect.left, ah = rect.height, at = rect.top, dh = tip.height, dw = tip.width;
-  
-//   echo({bw, al, ah, at, dh, dw, wrap:this, div});
-  
+    
   if(at > dh) div.style.top = (-dh) + 'px';
   else  div.style.top = (ah) + 'px';
   
@@ -1329,7 +1420,8 @@ function refhover(e) {
   }
   else  div.style.left = '0px';
   
-  var a = this.querySelector('a.allegro-ref');
+  var a = this.querySelector('a.allegro-ref, a.allegro-footnote');
+  if(!a) return;
   var fnid = ga(a, 'href');
   var fn = dqs(fnid);
   if(fn) fn.classList.add('target');
@@ -1337,7 +1429,8 @@ function refhover(e) {
 
 
 function refout(e) {
-  var a = this.querySelector('a.allegro-ref');
+  var a = this.querySelector('a.allegro-ref, a.allegro-footnote');
+  if(!a) return;
   var fnid = ga(a, 'href');
   var fn = dqs(fnid);
   if(fn) fn.classList.remove('target');
@@ -1346,8 +1439,6 @@ function refout(e) {
 function dictindexFilterable(list, i) {
   var placeholder = 'Filter list';
   list.dataset.jets = "dict"+i;
-  
-
   
   var searchqs = '[data-jets="inputdict'+i+'"]'
   var input = '<input type="search" class="inputbox noprint" placeholder="'+placeholder+'" size="30" data-jets="inputdict'+i+'"/>'
@@ -1387,6 +1478,7 @@ document.addEventListener('DOMContentLoaded', function(){
     maketables();
     makevideos();
     makereferences();
+    makepagereferences();
     aE('div.allegro-ref-wrap', 'mouseover', refhover);
     aE('div.allegro-ref-wrap', 'mouseout', refout);
     
