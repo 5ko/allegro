@@ -722,7 +722,7 @@ function FmtAllegroLinks($m) {
   if($args['mode'] == 'tags') {
     $otag = strval(@$args['tag']);
     if(@$args['request'] && @$_REQUEST['t']) $otag = $_REQUEST['t'];
-    
+    $otag = mb_convert_case($otag, MB_CASE_TITLE, "UTF-8");
     $tag = AllegroFold($otag);
     
     if(isset($data['=tags'][$tag])) $list = $data['=tags'][$tag];
@@ -754,6 +754,7 @@ function FmtAllegroLinks($m) {
     foreach($data as $pn=>$a) {
       if(!isset($a['tags'])) continue;
       foreach($a['tags'] as $t) {
+        $t = mb_convert_case($t, MB_CASE_TITLE, "UTF-8");
         @$alltags[$t]++;
         @$alltagspages[$t][] = $pn;
       }
@@ -787,13 +788,12 @@ function FmtAllegroLinks($m) {
     foreach ($alltags as $k => $v){
       if($v<$min) continue;
       $w = $base>1? log($v, $base) : $v;
-      $output .= sprintf($fmt, $w+10, $v, rawurlencode($k), $k);
+      $output .= "<li>". sprintf($fmt, $w+10, $v, rawurlencode($k), $k) . "</li>";
       if($count>0 && ++$i>=$count) break;
     }
-    return Keep($output);
+    $output = "<ul class='allegro-tagcloud filterable'>$output</ul>";
+    return "<:block>" . Keep($output);
   }
-  
-  
 }
 
 function AllegroTreeList($g, $tree, $level=0) {

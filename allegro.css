@@ -140,6 +140,16 @@ allegro-tag {
 /*   background-color: #fca; */
 }
 
+ul.allegro-tagcloud {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+ul.allegro-tagcloud li {
+  display: inline;
+}
+
 .trix-content blockquote, .trix-content .frame {
   border: 1px solid #aaa;
   border-radius: .3em;
