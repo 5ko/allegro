@@ -218,7 +218,7 @@ function mkmediajump() {
         found = true;
         mjcnt++;
       }
-      else if(found && n.tagName.match(/^h[23]$/i)) {
+      else if(found && n.matches('h2,h3,a[data-embed-provider]')) {
         if(mjcnt == mlen) break; // found all
         found = false;
       }
