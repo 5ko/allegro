@@ -1257,6 +1257,19 @@ document.addEventListener('trix-initialize', function(){
       onEnd: reorderSubpages
     });
     spages[0].closest('nav').style.display = 'block';
+    var labelalpha = 'Alphabetical';
+    var buttonalpha = '<input id="spalpha" class="inputbutton" type="button" value="'+labelalpha+'"/>';
+    var p = spages[0].parentNode.previousElementSibling;
+    adjbe(p, buttonalpha);
+    tap('#spalpha', function(e){
+      var a = [...spages];
+      a.sort(function(x, y){
+        return x.textContent.localeCompare(y.textContent);
+      });
+      var ul = spages[0].parentNode;
+      for(var i=0; i<a.length; i++) ul.appendChild(a[i]);
+      dqs('#sporder').value = "=alpha";
+    });
   }
   
   trix.addEventListener('keydown', AllegroKeyDown);

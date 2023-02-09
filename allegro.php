@@ -1073,7 +1073,11 @@ function HandleAllegroEdit(&$pagename, $auth = 'edit') {
     else  $new['text'] .= $markup;
     
     $sporder = @$_POST['ptv_SPOrder'];
-    if($sporder && preg_match("/($NamePattern)( ($NamePattern))*/", $sporder)) {
+    if($sporder == '=alpha') {
+      unset($pagedata['sporder'], $new['sporder']);
+      $_POST['ptv_SPOrder'] = '';
+    }
+    elseif($sporder && preg_match("/($NamePattern)( ($NamePattern))*/", $sporder)) {
       $pagedata['sporder'] = $new['sporder'] = $sporder;
     }
     $status = AllegroSanitizeVar(trim(strval(@$_POST["ptv_Status"])));
@@ -1102,23 +1106,14 @@ function HandleAllegroEdit(&$pagename, $auth = 'edit') {
     Lock(2);
     UpdatePage($pagename, $page, $new);
     AnonUserSetPagePerms($pagename);
-//     if(0 && @$_POST['delattach']) {
-//       // instead, get and update the list of attachments for this page
-//       $dlist = explode(' ', $_POST['delattach']);
-//       foreach($dlist as $dfile) AllegroDelAttach($pagename, $dfile);
-//     }
     Lock(0);
     
-    
     $AllegroData[$g][$n] = $pagedata;
-    
     AllegroData($g, true);
     
     return Redirect($pagename);
   }
   # ELSE !$posted, show edit form
-  
-  
   
   $InputValues['allegrotext'] = PHSC(preg_replace("!(<(\\/(div|ul|ol|li|blockquote|figure|figcaption|h\\d|pre)|br[\\/\\s]*)>)\\s*!i", "$1", $html), ENT_QUOTES);
   $InputValues['newpage'] = $isnew;
