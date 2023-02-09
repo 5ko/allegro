@@ -179,11 +179,7 @@ function FmtAllegro($m) {
   $args = ParseArgs($m[1]);
   $html = trim(htmlspecialchars_decode($m[2]));  
   
-  if($html && $html[0]==='`') {
-    $html = wiki2html($pagename, $html);
-  }
-  else
-    $html = AllegroSanitizeHTML($html);
+  $html = wiki2html($pagename, $html);
 
   if(@$args['editor']) {
     $html = @"<div class='allegro-editor'>
@@ -985,9 +981,6 @@ function HandleAllegroEdit(&$pagename, $auth = 'edit') {
     $InputValues, $AuthId, $Author, $AllegroNewPage, 
     $UploadUrlFmt, $UploadPrefixFmt, $WikiTitle, $UploadExts, $NamePattern;
 
-  if(@$_POST['allegrocancel']) {
-    return Redirect($pagename);
-  }
   
   list($g, $n) = explode('.', $pagename);
   AllegroData($g);
@@ -1018,11 +1011,7 @@ function HandleAllegroEdit(&$pagename, $auth = 'edit') {
     $args = ParseArgs($m[1]);
     $html = trim($m[2]);
     $GLOBALS["MarkupToHTML"]['pagename'] = $pagename;
-    if($html && $html[0]==='`') {
-      $html = wiki2html($pagename, MarkupEscape($html), true);
-    }
-    else
-      $html = AllegroSanitizeHTML($html);
+    $html = wiki2html($pagename, MarkupEscape($html), true);
     
     $orig = $m[0];
   }
@@ -1213,21 +1202,6 @@ function AllegroSanitizeVar($value) {
   return PPRA($ra, $value);
 }
 
-# TODO Once existing pages are migrated this can be removed
-function AllegroSanitizeHTML($html) { 
-  global $pagename, $UrlScheme;
-  
-  $schemehost = preg_quote($UrlScheme.'://'.$_SERVER['HTTP_HOST'] .'/', '/');
-  $ra = [
-    "!(<a [^>]*href=(['\"]))$schemehost(.*\\2)!is"=>"$1/$3",
-    "!(<img [^>]*src=(['\"]))$schemehost(.*\\2)!is"=>"$1/$3",
-    "/<\\/(div|li|ul|ol|blockquote|h\\d|pre|figure|figcaption)>(?!\n)/" => "$0\n",
-    "/<br[\\/\\s]*>\\s*/" => "$0\n",
-  ];
-
-//   $html = PPRA($ra, $html);
-  return $html;
-}
 
 function uncomment($txt='') {
   return str_replace(
