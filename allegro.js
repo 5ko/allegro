@@ -174,15 +174,7 @@ function makevideos(){
   for(var i=0; i<videolinks.length; i++) {
     var v = '<video controls="controls" preload="none" allowfullscreen="allowfullscreen" poster="'
       +videolinks[i].href+'.jpg"><source src="' +videolinks[i].href +'"></video>';
-    var ul = videolinks[i].closest('ul');
-    if(ul && ul.firstChild 
-      && ul.firstChild.textContent.trim().toLowerCase() == '[video]') {
-        adjbb(ul, v);
-      }
-    else {
-      adjbb(videolinks[i], v);
-      
-    }
+    adjbb(videolinks[i], v);
     videolinks[i].closest('figure').classList.add('allegrovideo');
   }
   
@@ -191,17 +183,7 @@ function makevideos(){
   var qs = '.allegro-content figure.attachment-file--mp3 a[href$=".mp3"], .allegro-content figure.attachment-file--m4a a[href$=".m4a"]';
   var x = dqsa(qs);
   for(var i=0; i<x.length; i++) {
-    var ul = x[i].closest('ul');
-    if(ul && ul.firstChild 
-      && ul.firstChild.textContent.trim().toLowerCase() == '[video]'
-      && ul.previousElementSibling && ul.previousElementSibling.nodeName == 'VIDEO') {
-      var s = document.createElement('source');
-      s.src = x[i].href;
-      s.type = 'audio/mpeg'; // FIXME
-      ul.previousElementSibling.appendChild(s);
-    }
-    else
-      adjbb(x[i], '<audio src="'+x[i].href+'" preload="metadata" controls></audio>');
+    adjbb(x[i], '<audio src="'+x[i].href+'" preload="metadata" controls></audio>');
   }
   
   
@@ -211,7 +193,8 @@ function makevideos(){
 }
 
 function mkmediajump() {
-  var medias = dqsa('video,audio');
+  var selector = 'video,audio,a[data-embed-provider="YouTube"]'
+  var medias = dqsa(selector);
   var mlen = medias.length;
   var par = dqs('div.allegro-content');
   if(!mlen||!par) return;
@@ -229,7 +212,7 @@ function mkmediajump() {
   var mjcnt = 0;
   while (n=walk.nextNode()) {
     if(n.nodeType == 1) {
-      if(n.tagName.match(/^(video|audio)$/i)) {
+      if(n.matches(selector)) {
         n.id = 'mj' + mjcnt;
         matches.push(n);
         found = true;
@@ -274,10 +257,20 @@ function mkmediajump() {
     for(var j=0;j<parts.length;j++) {
       sec += Math.pow(60, j)*parseInt(parts[j], 10);
     }
-    media.scrollIntoView();
-    media.currentTime = sec;
-    media.play();
-    media.dispatchEvent(new Event('play'));
+    if(media.matches('audio,video')) {
+      media.scrollIntoView();
+      media.currentTime = sec;
+      media.play();
+      media.dispatchEvent(new Event('play'));
+    }
+    else { // YouTube
+      var suffix = '&start=' + sec;
+      var url = media.dataset.embedUrl + suffix;
+      if(!media.parentNode.querySelector('iframe')) {
+        media.dispatchEvent(new Event('click'));
+      }
+      media.parentNode.querySelector('iframe').src = url;
+    }
   });
 
 }
