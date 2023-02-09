@@ -69,12 +69,13 @@ SDVA($Allegro, array(
   'AnonymousNewPagePat' => '-*',
   'EnableSubpages'=>1,
   'TagCloud' => [
-    'fmt'=> "<a class='taglink' style=\"font-size:%1.1Fpx;\" title=\"$[%d pages]\" 
+    'fmt'=> "<a class='taglink' style=\"font-size:%.3Fem;\" title=\"$[%d pages]\" 
       href=\"{\$PageUrl}?action=atag&amp;t=%s\">%s</a> ",
     'order'=>'alpha',
-    'log'=>1.3,
     'count'=>-1,
     'min' => 1,
+    'minfontsize'=> .9,
+    'maxfontsize'=> 1.8,
   ],
   'allegro2wiki' =>[ '`' => '&#96;', '´' => '&#180;'],
   'allegro2wiki2' =>[ 
@@ -750,13 +751,14 @@ function FmtAllegroLinks($m) {
     
     $fmt = FmtPageName($Allegro['TagCloud']['fmt'], $hpn);
   
-    $alltags = $alltagspages = [];
+    $alltags = [];
+    $mincnt = $maxcnt = 1;
     foreach($data as $pn=>$a) {
       if(!isset($a['tags'])) continue;
       foreach($a['tags'] as $t) {
         $t = mb_convert_case($t, MB_CASE_TITLE, "UTF-8");
         @$alltags[$t]++;
-        @$alltagspages[$t][] = $pn;
+        $maxcnt = max($maxcnt, $alltags[$t]);
       }
     }
     if(!count($alltags)) return '';
@@ -767,7 +769,7 @@ function FmtAllegroLinks($m) {
     $min = intval($args['min']);
     $count = intval($args['count']);
     
-    $base = floatval($args['log']);
+    $base = exp(log($maxcnt) / ($args['maxfontsize']-$args['minfontsize']));
       
     if($order[0]==='-') {
       $reverse = 1;
@@ -787,14 +789,15 @@ function FmtAllegroLinks($m) {
     $i = 0;
     foreach ($alltags as $k => $v){
       if($v<$min) continue;
-      $w = $base>1? log($v, $base) : $v;
-      $output .= "<li>". sprintf($fmt, $w+10, $v, rawurlencode($k), $k) . "</li>";
+      $w = log($v, $base) + $args['minfontsize'];
+      $output .= "<li>". sprintf($fmt, $w, $v, rawurlencode($k), $k) . "</li>";
       if($count>0 && ++$i>=$count) break;
     }
     $output = "<ul class='allegro-tagcloud filterable'>$output</ul>";
     return "<:block>" . Keep($output);
   }
 }
+
 
 function AllegroTreeList($g, $tree, $level=0) {
   if(preg_match('/^Template/', $tree['pn'])) return '';
@@ -1876,7 +1879,7 @@ function HandleAllegroReview($pagename, $auth = 'attr') {
 }
 
 function HandleAllegroDelete($pagename, $auth = 'attr') {
-  global $IsPagePosted, $EnableRedirect, $WikiDir, $AllegroData;
+  global $IsPagePosted, $EnableRedirect, $WikiDir, $AllegroData, $ChangeSummary;
   $page = RetrieveAuthPage($pagename, $auth, true, READPAGE_CURRENT);
   if(!$page) return Abort('?No permissions');
   if(!@$_POST['confirm'] || !@$_POST['csum']) 
@@ -1892,6 +1895,7 @@ function HandleAllegroDelete($pagename, $auth = 'attr') {
   unset($AllegroData[$g][$n]);
   AllegroData($g, true);
   $IsPagePosted = true;
+  $ChangeSummary = XL('Delete') . " \"{$page['title']}\" ($ChangeSummary)";
   PostRecentChanges($pagename,$page,$page);
   return Redirect($parent);
 }
