@@ -991,17 +991,17 @@ function HandleAllegroEdit(&$pagename, $auth = 'edit') {
   
   pm_session_start();
   
-  if(isset($_POST['allegrotext'])) {
-    $page = AllegroRetrieveNewPage($pagename, $auth, true);
-    $posted = 1;
-  }
-  else {
-    $page = AllegroRetrieveNewPage($pagename, $auth, true, READPAGE_CURRENT);
-    $posted = 0;
-  }
+  $page = $page2 = AllegroRetrieveNewPage($pagename, $auth, true);
   if(!$page) {
     unset($_SESSION['AllegroEdit']);
     return Abort('? $[No permissions]');
+  }
+  if(isset($_POST['allegrotext'])) {
+    $posted = 1;
+  }
+  else {
+    RestorePage($pagename,$page2,$page);
+    $posted = 0;
   }
   
   $canupload = CondAuth($pagename, 'upload');
@@ -1895,6 +1895,11 @@ function HandleAllegroDelete($pagename, $auth = 'attr') {
   PostRecentChanges($pagename,$page,$page);
   return Redirect($parent);
 }
+
+$DiffRestoreFmt = "<div class='diffrestore'>
+  <a href='{\$PageUrl}?action=aedit&amp;restore=\$DiffId' title=\"$[Restore in visual editor]\">$[Restore]</a> |
+  <a href='{\$PageUrl}?action=edit&amp;restore=\$DiffId&amp;preview=y' title=\"$[Restore in code editor]\">$[Restore code]</a>
+  </div>";
 
 $PageDiffFmt = array(
   "wiki:Site.DeletePageForm",
