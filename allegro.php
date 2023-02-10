@@ -34,8 +34,12 @@ $RecipeInfo['Allegro']['Version'] = '20230207';
 
 Markup("allegro", '<&amp;amp;', "/\\(:allegro( .*?)?:\\)\n?(.*?)\n?\\(:allegroend:\\)/is", 'FmtAllegro');
 
-// sidebar, tree, subpages
+# sidebar, tree, subpages
 Markup("allegro-pages", 'directives', "/\\(:allegro-pages(.*?):\\)/i", 'FmtAllegroLinks'); 
+
+# Show changes since reviewed version.
+include_once("$FarmD/scripts/pagerev.php");
+Markup("allegro-reviewdiff", 'directives', "/\\(:allegro-reviewdiff(.*?):\\)/i", 'FmtAllegroRevDiff'); 
 
 SDVA($HandleActions, array(
   'awatermark' => 'HandleAllegroWatermark',
@@ -112,7 +116,6 @@ foreach($AllegroLinkFmt as &$fmt) {
   $fmt = preg_replace("/<a /", "$0data-status='{\$Status}' data-group='\$Group' ", $fmt, 1);
 }
 
-
 $ModuleHeaderFmt[] = 'js-lib/highlight.min.js'; # source code syntax
 $ModuleHeaderFmt[] = 'js-lib/highlight.default.min.css';
 
@@ -156,6 +159,9 @@ SDVA($CustomSyntax, array(
 
 
 
+$FmtPV['$ReviewBy'] = '@$page["reviewby"]';
+$FmtPV['$ReviewTime'] = '@$page["reviewtime"]';
+$FmtPV['$ReviewText'] = '@$page["reviewtext"]';
 $FmtPV['$AllegroNextPageName'] = 'AllegroNextPageName($pn)';
 $FmtPV['$Status'] = '$page["status"]??"draft"';
 
@@ -166,8 +172,17 @@ function AllegroCondSubpages($pagename) {
   
   $data = AllegroData($g);
   $apage = @$data[$n];
-  if($apage && isset($apage['subpages'])) return count($apage['subpages']);
+  if($apage && isset($data['=subpages'][$n])) return count($data['=subpages'][$n]);
   return false;
+}
+
+function FmtAllegroRevDiff($m) {
+  global $DiffFunction, $FmtV;
+  extract($GLOBALS['MarkupToHTML']);
+  $text = strval(@$FmtV['$PageSourceText']);
+  $rtext = PageVar($pagename, '$ReviewText');
+  $diff = $DiffFunction($text, $rtext);
+  return KeepBlock(DiffHTML($pagename, $diff));
 }
 
 function FmtAllegro($m) {
@@ -185,7 +200,7 @@ function FmtAllegro($m) {
     $html = @"<div class='allegro-editor'>
       <trix-editor class='trix-content' input='allegrotext' placeholder='{$args['placeholder']}'></trix-editor>
       </div>";
-    return '<:block>' . Keep($html);
+    return KeepBlock($html);
   }
   else {
     asort($Allegro['PostProcessFunctions']);
@@ -198,11 +213,10 @@ function FmtAllegro($m) {
     
     $html = "<div class='trix-content allegro-content' data-status='$pagestatus'>$html</div>";
     
-    $out = '<:block>' . Keep($html);
+    $out = KeepBlock($html);
     
-    if($Allegro['EnableSubpages']) 
-      return PRR("$out\n(:allegro-pages mode=subpages:)\n");
-    else return $out;
+    $out = "(:include Site.ReviewHeader:)\n$out\n(:allegro-pages mode=subpages:)\n";
+    return PRR($out);
   }
 }
 
@@ -264,8 +278,8 @@ function AllegroTrails($pagename, $html, $opt) {
   $parent = @$data[$parentname];
   if(!$parent) return $html; // orphan?
   
-  $subpages = array_values(preg_grep('/^Template/', (array)@$parent['subpages'], PREG_GREP_INVERT));
-  
+  $subpages = array_values(preg_grep('/^Template/', 
+    (array)@$data['=subpages'][$parentname], PREG_GREP_INVERT));
   
   $pos = array_search($n, $subpages);
   if($pos === false)  return $html; // bug?
@@ -290,7 +304,6 @@ function AllegroTrails($pagename, $html, $opt) {
 }
 
 function AllegroTrailLink($data, $g, $pn, $cname) {
-  
   $title = $data[$pn]['title'];
   $status = $data[$pn]['status'];
   $htitle = PHSC($title, ENT_QUOTES, null, false);
@@ -392,6 +405,17 @@ function AllegroLinearSections($pagename, $html) {
   return $out;
 }
 
+function AllegroSortSubpages($a, $b) {
+  $delta = $a[0] - $b[0];
+  if($delta) return $delta;
+  return strnatcasecmp($a[1], $b[1]);
+}
+
+function a_is_orphan($g, $data, $nn, $hnn) {
+  if($nn == $hnn) return false;
+  if(!$nn || !$data[$nn]) return true;
+  return a_is_orphan($g, $data, @$data[$nn]['parent'], $hnn);
+}
 
 function AllegroData($g, $save = false){
   global $Allegro, $AllegroData;
@@ -413,40 +437,54 @@ function AllegroData($g, $save = false){
       $namelist[] = substr($pn, $skip);
     }
     
-    // add orphans
+    # add orphans
     foreach($namelist as $nn) {
       if(!isset($data[$nn])) {
         $data[strval($nn)] = array('title'=>PageVar("$g.$nn", '$Title'));
       }
     }
     
+    # resolve the actual homepage
+    $hpn = MakePageName("$g.$g", "$g.");
+    list($hgg, $hnn) = explode('.', $hpn);
+    
     // rm deleted
-    $data2 = array();
+    $data2 = array('=homename' => $hnn, '=subpages'=>[], '=orphan'=>[]);
+    
     foreach($data as $nn=>&$a) {
       if(in_array($nn, $namelist)) {
         if(! @$a['status']) $a['status'] = 'draft';
         if(isset($a['tags'])) $a['tags'] = array_values($a['tags']);
         $data2[strval($nn)] = $a;
+        @$data2['=subpages'][strval(@$a['parent'])][] = $nn;
+        
+        if(a_is_orphan($g, $data, $nn, $hnn)) $data2['=orphan'][] = $nn;
       }
+    }
+    foreach($data2['=subpages'] as $nn=>&$a) {
+      $b = [];
+      if(isset($data2[$nn]['sporder'])) {
+        $c = explode(' ', $data2[$nn]['sporder']);
+      }
+      else $c = [];
+      foreach($a as $sn) {
+        $idx = array_search($sn, $c);
+        if($idx === false) $idx = 99999999;
+        $b[$sn] = [$idx, $data2[$sn]['title']];
+        
+      }
+      uasort($b, 'AllegroSortSubpages');
+      $a = array_keys($b);
     }
     $data = $data2;
     
-    # resolve the actual homepage
-    $hpn = MakePageName("$g.$g", "$g.");
-    list($hgg, $hnn) = explode('.', $hpn);
-    
-    $data['=homename'] = $hnn;
     $data['=tree'] = AllegroSubtree($data, $hnn);
     
-    $data['=orphan'] = $data['=tags'] = $data['=untags'] = $data['=templates'] = array();
+    $data['=tags'] = $data['=untags'] = $data['=templates'] = array();
     $max = 0;
-    
     foreach($data as $pn=>&$a) {
       $pn = strval($pn);
       if(strlen($pn) && $pn[0]=='=') continue;
-      
-      elseif(@$a['attached']) unset($a['attached']);
-      else $data['=orphan'][] = $pn;
       
       $max = max($max, intval($pn, 10));
       
@@ -457,9 +495,6 @@ function AllegroData($g, $save = false){
       foreach((array)$a['tags'] as $tag) {
         @$data['=tags'][$tag][] = $pn;
       }
-      
-      
-      
     }
     $data['=nextpagename'] = sprintf($Allegro['NextPageNameFmt'], $g, $max + 1);
     $AllegroData[$g] = $data;
@@ -491,33 +526,15 @@ function AllegroHiddenPages($nn, &$data) {
 }
 
 function AllegroSubtree(&$data, $pn, $prevlevel=-1) {
-
   $level = $prevlevel+1;
-  
-  $subpages =  $subpages2 = array();
-  $title = @$data[$pn]['title'];
-  $status = $data[$pn]['status'] ?? 'draft';
-  $order = explode(' ', strval(@$data[$pn]['sporder']));
-  
-  foreach($data as $k=>$a) {
-  
-    if(!isset($a['parent']) || $pn != $a['parent']) continue;
-    if(preg_match('/^Template/', $pn)) continue;
-  
-    $idx = array_search($k, $order);
-    if($idx === false) $idx = 99999999;
-    $sp = array('idx'=>$idx, 'parent'=>$pn);
-    $sp = array_merge($sp, AllegroSubtree($data, $k, $level));
-    $subpages[] = $sp;
+  if(!isset($data['=subpages'][$pn])) return [];
+  $sp = $data['=subpages'][$pn];
+  $out = [];
+  foreach($sp as $nn) {
+    $subtree = AllegroSubtree($data, $nn, $level);
+    $out[] = [$nn, $subtree];
   }
-  $data[$pn]['attached'] = 1;
-  usort($subpages, 'AllegroSubpageSort');
-  foreach($subpages as $a) {
-    $subpages2[] = $a['pn'];
-  }
-  $data[$pn]['subpages'] = $subpages2;
-  
-  return array('pn'=>$pn, 'title'=>$title, 'level'=>$level, 'status'=>$status, 'subpages'=>$subpages);
+  return $out;
 }
 
 function AllegroSubpageSort($x, $y) {
@@ -525,9 +542,6 @@ function AllegroSubpageSort($x, $y) {
   if($diff) return $diff;
   return strnatcasecmp($x['title'], $y['title']);
 }
-
-
-
 
 function FmtAllegroLst($g, $names, $data, $args, $defaultcname, $defaultlabel) {
   if(@$args['name']) $names = MatchNames($names, $args['name']);
@@ -568,7 +582,6 @@ function FmtAllegroLinks($m) {
   
   $data = AllegroData($g);
   
-  
   if($args['mode'] == 'dictindex') {
     $cname = @$args['cname']? $args['cname'] : 'allegro-dictindex';
     $dict = [];
@@ -597,18 +610,16 @@ function FmtAllegroLinks($m) {
       
     return PRR($out);
   }
-  if($args['mode'] == 'linktree') {
-    $out = AllegroTreeList($g, $data['=tree'] );
-    
+  if($args['mode'] == 'linktree') { # edit form link dialogue
+    $out = AllegroTreeList($data, $g);
     
     $cname = @$args['cname']? $args['cname'] : 'allegro-tree';
     
     $out = "(:nav class=\"$cname\":)\n$out(:navend:)\n";
     return PRR($out);
   }
-  if($args['mode'] == 'tree') {
-    $subtree = AllegroSubtree($data, $n);
-    $out = AllegroTreeList($g, $subtree);
+  if($args['mode'] == 'tree') { # homepage, or subtree of a page
+    $out = AllegroTreeList($data, $n);
     
     
     $cname = @$args['cname']? $args['cname'] : 'allegro-tree';
@@ -672,9 +683,8 @@ function FmtAllegroLinks($m) {
     if(!$Allegro['EnableSubpages']) return '';
     $currpage = @$InputValues['newpage'] ? '=new' : $n;
     
-    // possibly interlink
-    
-    $selectparent = AllegroParentSelect($data['=tree'], $currpage, 0);
+    # possibly interlink
+    $selectparent = AllegroParentSelect($data, $g, $currpage);
     if($selectparent) {
       $label = isset($args['label']) ? $args['label'] : XL('Parent:');
       return Keep("$label <select name='ptv_Parent'>$selectparent</select><br/>");
@@ -682,7 +692,8 @@ function FmtAllegroLinks($m) {
     return '';
   }
   if($args['mode'] == 'subpages') {
-    $subpages = (array)@$data[$n]['subpages'];
+    if(!IsEnabled($Allegro['EnableSubpages'], 1)) return "";
+    $subpages = (array)@$data['=subpages'][$n];
     $defaultlabel = ($n == $data['=homename'])? '$[Categories]' : '$[Subpages]';
     $label = $args['label'] ?? $defaultlabel;
     return FmtAllegroLst($g, $subpages, $data, $args, 'allegro-subpages', $label);
@@ -702,7 +713,8 @@ function FmtAllegroLinks($m) {
     while($parent) {
       $parents[] = $parent;
       $next = strval(@$data[$parent]['parent']);
-      if($next != $parent) $parent = $next;
+      if($next !== $parent) $parent = $next;
+      else break;
     }
     
     $parentgrouplink = '';
@@ -790,54 +802,49 @@ function FmtAllegroLinks($m) {
       if($count>0 && ++$i>=$count) break;
     }
     $output = "<ul class='allegro-tagcloud filterable'>$output</ul>";
-    return "<:block>" . Keep($output);
+    return KeepBlock($output);
   }
 }
 
 
-function AllegroTreeList($g, $tree, $level=0) {
-  if(preg_match('/^Template/', $tree['pn'])) return '';
-  $label = PHSC($tree['title']);
-  
-  $status = $tree['status']?? 'draft';
+function AllegroTreeList($data, $nn, $level=0) {
+  if(preg_match('/^Template/', $nn)) return '';
+  $sp = $data['=subpages'];
+  $label = PHSC($data[$nn]['title']);
   $indent = str_repeat('*', $level);
   
-  $s = '';
-  $children = '';
-  // cannot select itself as parent or its own children
-  foreach($tree['subpages'] as $a) {
-    $children .= AllegroTreeList($g, $a, $level+1);
+  $out = "{$indent}[[{*\$Group}.$nn|$label]]\n";
+  $level++;
+  if(isset($sp[$nn])) foreach($sp[$nn] as $sn) {
+    $out .= AllegroTreeList($data, $sn, $level);
   }
-  $option = "{$indent}%astatus astatus-$status%[[ $g.{$tree['pn']} | $label ]]%%\n";
-  
-  return $option.$children;
+  return $out;
 }
 
-function AllegroParentSelect($tree, $currentpage=null, $level=0) {
-  $label = PHSC($tree['title']);
-  $nn = $tree['pn'];
-  if($nn == $currentpage||preg_match('/^Template/', $nn)) { 
-    # group homepage or template
-    return '';
-  }
+function AllegroParentSelect($data, $nn, $currentpage=null, $level=0) {
+  global $Allegro;
+  $parent = @$data[$nn]['parent'];
+  if(!$parent && @$data[$bn]['parent']) $parent = $data[$bn]['parent'];
+  if(!$parent && @$data[$dn]['parent']) $parent = $data[$dn]['parent'];
+  
+  # cannot select self or own subpages as parent
+  if($nn == $currentpage || @$bn == $currentpage || @$dn == $currentpage) return '';
+  $sp = $data['=subpages'];
+  $label = PHSC($data[$nn]['title']);
   $indent = str_repeat('&nbsp;&nbsp;&nbsp;', $level);
   
-  $s = '';
-  $children = '';
-  // cannot select itself as parent or its own children
-  foreach($tree['subpages'] as $a) {
-    if($a['pn'] == $currentpage) {
-      $s =  'selected="selected"';
-    }
-    else {
-      $children .= AllegroParentSelect($a, $currentpage, $level+1);
-    }
+  $level++;
+  $s = $children = '';
+  if($currentpage == $parent) {
+    $s = 'selected="selected"';
+  }
+  else foreach((array)@$data['=subpages'][$nn] as $sn) {
+    if($sn == $currentpage) continue;
+    $children .= AllegroParentSelect($data, $sn, $currentpage, $level);
   }
   $option = "<option value='$nn'$s>$indent$label</option>\n";
-  
   return $option.$children;
 }
-
 
 function AllegroDelAttach($pagename, $upname) {
   global $Now, $UploadFileFmt;
@@ -850,15 +857,10 @@ function AllegroDelAttach($pagename, $upname) {
   }
 }
 
-
-
-
 function HandleAllegroTags($pagename, $auth = 'read') {
+  global $PageStartFmt, $PageEndFmt, $Allegro;
   $page = RetrieveAuthPage($pagename, $auth, true, READPAGE_CURRENT);
   if(!$page) return Abort('?no permissions');
-  
-  global $PageStartFmt, $PageEndFmt, $Allegro;
-  
   
   $print = array($PageStartFmt,
     '<div id="wikitext">',
@@ -867,12 +869,7 @@ function HandleAllegroTags($pagename, $auth = 'read') {
   
   PrintFmt($pagename, $print);
   exit;
-  
-
 }
-
-
-
 
 function HandleAllegroUpload($pagename, $auth = 'upload') {
   global $FmtV, $UploadRedirectFunction;
@@ -980,7 +977,6 @@ function HandleAllegroEdit(&$pagename, $auth = 'edit') {
     $PageEndFmt, $WikiDir, $ChangeSummary,
     $InputValues, $AuthId, $Author, $AllegroNewPage, 
     $UploadUrlFmt, $UploadPrefixFmt, $WikiTitle, $UploadExts, $NamePattern;
-
   
   list($g, $n) = explode('.', $pagename);
   AllegroData($g);
@@ -996,12 +992,11 @@ function HandleAllegroEdit(&$pagename, $auth = 'edit') {
     $posted = 1;
   }
   else {
-    RestorePage($pagename,$page2,$page);
+    RestorePage($pagename, $page2, $page);
     $posted = 0;
   }
   
   $canupload = CondAuth($pagename, 'upload');
-  
   
   $_SESSION['AllegroEdit'][$g] = 1;
   
@@ -1039,7 +1034,6 @@ function HandleAllegroEdit(&$pagename, $auth = 'edit') {
     
     $text = allegro2wiki($_POST['allegrotext']);
     
-    
     $markup = "(:allegro:)$text(:allegroend:)";
     
     $new = $page;
@@ -1070,6 +1064,9 @@ function HandleAllegroEdit(&$pagename, $auth = 'edit') {
       $pagedata['sporder'] = $new['sporder'] = $sporder;
     }
     $status = AllegroSanitizeVar(trim(strval(@$_POST["ptv_Status"])));
+    if($status == 'reviewed' && !CondAuth($pagename, 'attr')) {
+      $status = $_POST["ptv_Status"] = 'draft';
+    }
     $pagedata['status'] = $new['status'] = $status;
     
     
@@ -1087,9 +1084,11 @@ function HandleAllegroEdit(&$pagename, $auth = 'edit') {
     $new['text'] = rtrim(preg_replace('/\\(:title .*?:\\)/i', '', $new['text']));
     $new['text'] = rtrim($new['text']) . "\n(:title $title:)\n";
     if($status == 'reviewed') {
-      $new['reviewtime'] = $Now;
       $new['reviewtext'] = $new['text'];
+      $new['reviewtime'] = $Now;
+      $new['reviewby'] = $AuthId;
     }
+    list($g, $n) = explode('.', $pagename);
     
     $new["csum"] = $new["csum:$Now"] = $ChangeSummary;
     Lock(2);
@@ -1144,13 +1143,11 @@ function HandleAllegroEdit(&$pagename, $auth = 'edit') {
   
   $InputValues['allegrovars'] = PHSC(AllegroJE($vars), ENT_QUOTES);
   
-  if(@$AllegroData[$g][$n]['subpages']) {
-    
-    $sp = preg_grep('/^Template/', $AllegroData[$g][$n]['subpages'], PREG_GREP_INVERT);
+  if(@$AllegroData[$g]['=subpages'][$n]) {
+    $sp = preg_grep('/^Template/', $AllegroData[$g]['=subpages'][$n], PREG_GREP_INVERT);
     $sporder = implode(" ", $sp);
     $InputValues['ptv_SPOrder'] = $sporder;
   }
-
 
   DisableSkinParts($Allegro['DisableSkinParts']);
   
@@ -1202,7 +1199,6 @@ function AllegroSanitizeVar($value) {
   return PPRA($ra, $value);
 }
 
-
 function uncomment($txt='') {
   return str_replace(
     [ '[=', '=]',   '[@', '@]',   '(:', ':)'], 
@@ -1213,7 +1209,6 @@ function uncomment($txt='') {
 function figure2wiki($m){
   global $pagename;
   list($g, $n) = explode('.', $pagename);
-  
   
   $m[1] = preg_replace('!\\s+!', ' ', $m[1]);
   $args = ParseArgs($m[1], '(?>(\\w[-\\w]*)[=])');
@@ -1257,7 +1252,6 @@ function figure2wiki($m){
       return "[[Math$size:{$mm[1]}\"[=$input=]\"$caption]] ";
     }
   }
-  
   
   $url = isset($a['url'])? $a['url'] : @$a['href'];
   
@@ -1309,7 +1303,6 @@ function link2wiki($m) {
   
   if(strpos($href, $ScriptUrl)===0) {
     $href = substr($href, strlen($ScriptUrl));
-    
   }
   
   if(preg_match('!^/(.+?)/([^/]+)$!', $href, $mm)) {
@@ -1346,7 +1339,6 @@ function allegro2wiki($in=false) {
   $out = preg_replace('!<figcaption([^>]*)>\\s*</figcaption>!s', '', $out);
   
   $out = preg_replace('!</(strong|em)>(<a\\s.*?>|</a>)<\\1>!s', '$2', $out);
-  
 
   # figure attributes may contain <>
   $out = PRCB('!<figure((?:\\s+[-\\w]+=".*?")+)>(.*?)</figure>!si', 
@@ -1369,7 +1361,6 @@ function allegro2wiki($in=false) {
   
   return $out;
 }
-
 
 function wikifigure2html($a) {
   $b = [];
@@ -1414,9 +1405,7 @@ function wikifigure2html($a) {
   $html = "<figure $attr>$content</figure> ";
   if($cname=='content') $html = "<span style=\"background-color: inherit;\">$html</span> ";
   return $html;
-  
 }
-
 
 function wikiattach2html($m, $pagename) {
   global $Allegro, $UploadExts, $FmtV;
@@ -1431,7 +1420,6 @@ function wikiattach2html($m, $pagename) {
     $fname = preg_replace('!\\?r=\\d+$!', '', $fname);
     $rand = $r[0];
   }
-  
   
   $a = $b = [];
   if($imap == 'Math') {
@@ -1522,14 +1510,9 @@ function wikiref2html($m) {
   
   $out = wikifigure2html($a);
   return $out;
-
 }
 
-
-
-
 function wikilink2html($m, $pagename) {
-//   extract($GLOBALS["MarkupToHTML"]);
   return MakeLink($pagename,$m[1],@$m[2]);
 }
 
@@ -1550,7 +1533,6 @@ function wiki2html($pagename, $in, $edit=false) {
       
   $out = PRCB("/\\[\\[(.*?)\\s*(?:\\|\\s*(.*?))?\\s*\\]\\]/", 'wikilink2html', $out, $pagename);
 
-  
   $out = str_replace(
     array_values($Allegro['allegro2wiki2']), 
     array_keys($Allegro['allegro2wiki2']),
@@ -1567,9 +1549,6 @@ function wiki2html($pagename, $in, $edit=false) {
   
   return $out;
 }
-
-
-
 
 $EditFunctions[] = 'AllegroFormSaveTranslations';
 function AllegroFormSaveTranslations($pagename, $page, $new) {
@@ -1590,23 +1569,18 @@ function AllegroFormSaveTranslations($pagename, $page, $new) {
   aform_jfile($transfname, $allstrings);
 }
 
-
-
 $HandleActions['libcalc'] = 'HandleLibCalc';
 function HandleLibCalc($pagename, $auth='read') {
   global $Allegro;
   
   header('Content-Type: application/javascript; charset=UTF-8');
   
-  
   list($g, $n) = explode('.', $pagename);
   $glen = strlen($g);
   
   $listglob = isset($_GET['list'])? $_GET['list'] : $pagename;
   
-  
   $listglob = FixGlob($listglob, '$1Forms.$2');
-
   
   $list = ListPages($listglob);
   
@@ -1633,8 +1607,6 @@ function HandleLibCalc($pagename, $auth='read') {
     
     $json = aform_je($ar);
     $out .= "afConfig['$nn'] = $json;\n\n";
-    
-    
   }
   
   echo $out;
@@ -1683,7 +1655,6 @@ $MarkupDirectiveFunctions['listref'] = 'FmtListRef';
 function FmtListRef($pagename, $directive, $args, $content = null) {
   global $Allegro;
   
-  
   $bibfname = $Allegro['DataDir']. '/biblio.json';
   $allstrings = aform_jfile($bibfname);
   
@@ -1719,7 +1690,7 @@ function FmtListRef($pagename, $directive, $args, $content = null) {
   ksort($items);
   
   $list = "<ul class='filterable bibliolist'>".implode('', $items)."</ul>";
-  return '<:block>'.Keep($list);
+  return KeepBlock($list);
 }
 
 function mkReference($a) {
@@ -1765,9 +1736,7 @@ function mkReference($a) {
   }
   
   return implode(', ', $parts);
-
 }
-
 
 function HandleAllegroWatermark($pagename) {
   $wm = trim(strval(@$_REQUEST['wm']));
@@ -1792,7 +1761,6 @@ EOF;
   print $out;
   exit;
 }
-
 
 function HandleAllegroNamespace($pagename, $auth = 'admin') {
   global $MessagesFmt;
@@ -1918,12 +1886,6 @@ function AllegroDiffPrepare($x) {
     $x, -1, PREG_SPLIT_DELIM_CAPTURE);
 }
 
-$FmtPV['$IsReviewed'] = 'AllegroIsReviewed($page)';
-function AllegroIsReviewed($page) {
-  return "";
-}
-
-
 $MarkupDirectiveFunctions['aform'] = 'FmtAllegroForm';
 function FmtAllegroForm($pagename, $directive, $args, $content = null) {
   global $HTMLHeaderFmt, $AllegroEmbeddedForms;
@@ -1936,10 +1898,8 @@ function FmtAllegroForm($pagename, $directive, $args, $content = null) {
   $list = implode(',', array_keys($AllegroEmbeddedForms));
   AllegroLoadFormsHeader($pagename, $list);
   
-  return '<:block>' . Keep("<div class='libcalcformPreview'>$id</div>");
-  
+  return KeepBlock("<div class='libcalcformPreview'>$id</div>");
 }
-
 
 function HandleAllegroUploadMath($pagename, $auth) {
   global $UploadFileFmt, $FmtV, $Now;
@@ -1967,7 +1927,6 @@ function HandleAllegroUploadMath($pagename, $auth) {
   }
   exit;
 }
-
 
 function HandleAllegroVideoCover($pagename, $auth) {
   global $Allegro, $UploadFileFmt;
@@ -2053,7 +2012,6 @@ function HandleAllegroVideoCover($pagename, $auth) {
   header('Content-Type: image/jpeg');
   readfile($path);
 }
-
 
 function AlegroVideoCoverReject($msg=false) {
   global $Allegro;

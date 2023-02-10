@@ -1074,3 +1074,14 @@ time[title] {
 .deletepageform {
   background-color: #fcc;
 }
+
+p.reviewstatus-reviewed,
+p.reviewstatus-draft,
+details.reviewdetails summary {
+  color: #f40;
+  font-style:italic;
+}
+p.reviewstatus-reviewed {
+  color: green;
+}
+
