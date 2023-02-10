@@ -823,22 +823,20 @@ function AllegroTreeList($data, $nn, $level=0) {
 
 function AllegroParentSelect($data, $nn, $currentpage=null, $level=0) {
   global $Allegro;
-  $parent = @$data[$nn]['parent'];
-  if(!$parent && @$data[$bn]['parent']) $parent = $data[$bn]['parent'];
-  if(!$parent && @$data[$dn]['parent']) $parent = $data[$dn]['parent'];
+  $currentparent = $currentpage? $data[$currentpage]['parent'] : false;
   
   # cannot select self or own subpages as parent
-  if($nn == $currentpage || @$bn == $currentpage || @$dn == $currentpage) return '';
+  if($nn == $currentpage) return '';
   $sp = $data['=subpages'];
   $label = PHSC($data[$nn]['title']);
   $indent = str_repeat('&nbsp;&nbsp;&nbsp;', $level);
   
   $level++;
   $s = $children = '';
-  if($currentpage == $parent) {
+  if($currentparent === $nn) {
     $s = 'selected="selected"';
   }
-  else foreach((array)@$data['=subpages'][$nn] as $sn) {
+  foreach((array)@$data['=subpages'][$nn] as $sn) {
     if($sn == $currentpage) continue;
     $children .= AllegroParentSelect($data, $sn, $currentpage, $level);
   }
