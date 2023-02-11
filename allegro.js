@@ -97,7 +97,7 @@ function maketables() {
   var ul_items = dqsa('.allegro-content > ul > li:first-child, .allegro-content details > ul > li:first-child');
   for(var i=0; i<ul_items.length; i++) {
     var tc = ul_items[i].textContent
-    if(tc.match(/^\s*\[TAB\]\s*(.*?)$/)) makesimpletable(ul_items[i].parentNode);
+    if(tc.match(/^\s*\[TAB|TABLE|TABELLE\]\s*(.*?)$/)) makesimpletable(ul_items[i].parentNode);
     else if(tc.match(/^\s*\[FILTER\]\s*(.*?)$/)) {
       ul_items[i].style.display = 'none';
       makeFilterable(ul_items[i].parentNode);

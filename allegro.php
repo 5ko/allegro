@@ -760,25 +760,29 @@ function FmtAllegroLinks($m) {
     $fmt = FmtPageName($Allegro['TagCloud']['fmt'], $hpn);
   
     $alltags = [];
-    $mincnt = $maxcnt = 1;
     foreach($data as $pn=>$a) {
       if(!isset($a['tags'])) continue;
       foreach($a['tags'] as $t) {
         $t = mb_convert_case($t, MB_CASE_TITLE, "UTF-8");
         @$alltags[$t]++;
-        $maxcnt = max($maxcnt, $alltags[$t]);
       }
     }
     if(!count($alltags)) return '';
+    $maxcnt = max($alltags);
+    $mincnt = min($alltags);
       
     SDVA($args, $Allegro['TagCloud']);
 
     $order = $args['order'];
-    $min = intval($args['min']);
+    $min = max($mincnt, intval($args['min']));
     $count = intval($args['count']);
+    $deltafontsize = $args['maxfontsize']-$args['minfontsize'];
+    $min1 = $min-1;
+    $max1 = $maxcnt - $min1;
+    # we have log($min-$min1, $base) == 0;
+    # we need log($max1, $base) == $deltafontsize;
+    $base = pow($max1, 1/$deltafontsize);
     
-    $base = exp(log($maxcnt) / ($args['maxfontsize']-$args['minfontsize']));
-      
     if($order[0]==='-') {
       $reverse = 1;
       $order = substr($order, 1);
@@ -823,7 +827,7 @@ function AllegroTreeList($data, $nn, $level=0) {
 
 function AllegroParentSelect($data, $nn, $currentpage=null, $level=0) {
   global $Allegro;
-  $currentparent = $currentpage? $data[$currentpage]['parent'] : false;
+  $currentparent = $currentpage? @$data[$currentpage]['parent'] : false;
   
   # cannot select self or own subpages as parent
   if($nn == $currentpage) return '';
