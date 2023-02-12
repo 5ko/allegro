@@ -950,7 +950,6 @@ function AnonUserSetPagePerms($pagename = null) {
   return $perms;
 }
 @$LogoutCookies[] = 'known_user';
-AnonUserSetPagePerms();
 
 
 function HandleAllegroEdit(&$pagename, $auth = 'edit') {
