@@ -30,7 +30,7 @@
   * Lazy Image Loading?
   
 */
-$RecipeInfo['Allegro']['Version'] = '20230207';
+$RecipeInfo['Allegro']['Version'] = '20230212';
 
 Markup("allegro", '<&amp;amp;', "/\\(:allegro( .*?)?:\\)\n?(.*?)\n?\\(:allegroend:\\)/is", 'FmtAllegro');
 
@@ -66,7 +66,7 @@ SDVA($HandleAuth, array(
 SDVA($AllegroData, array( ));
 
 SDVA($Allegro, array(
-  'PubDirUrl' => "$ModuleDirUrl/allegro",
+  'PubDirUrl' => $ModuleDirUrl,
   'DisableSkinParts' => 'Left Header Footer Action Title',
   'NextPageNameFmt' => '%s.%04d',
   'DataDir' => "$WorkDir/.allegro",
@@ -116,36 +116,15 @@ foreach($AllegroLinkFmt as &$fmt) {
   $fmt = preg_replace("/<a /", "$0data-status='{\$Status}' data-group='\$Group' ", $fmt, 1);
 }
 
-$ModuleHeaderFmt[] = 'js-lib/highlight.min.js'; # source code syntax
-$ModuleHeaderFmt[] = 'js-lib/highlight.default.min.css';
+$ModuleHeaderFmt[] = "$ModuleDirUrl/dqsa-lib.js allegro.css allegro.js allegro-ref.js";
+$ModuleHeaderFmt[] = array("$ModuleDirUrl/allegro-forms.js", 'data-dirurl'=>$Allegro['PubDirUrl']);
 
-$ModuleHeaderFmt[] = 'js-lib/jets.min.js'; # filterable
-$ModuleHeaderFmt[] = 'js-lib/decimal.min.js'; # precision math
-
-$ModuleHeaderFmt[] = 'js-lib/trix.css'; # visual editor
-$ModuleHeaderFmt[] = 'js-lib/trix.js';
-
-$ModuleHeaderFmt[] = 'allegro/dqsa-lib.js'; # utilities
-$ModuleHeaderFmt[] = 'allegro/allegro.css';
-$ModuleHeaderFmt[] = 'allegro/allegro.js';
-$ModuleHeaderFmt[] = array('allegro/allegro-forms.js', 'data-dirurl'=>$Allegro['PubDirUrl']);
-$ModuleHeaderFmt[] = 'allegro/allegro-forms-advanced.js';
-$ModuleHeaderFmt[] = 'allegro/allegro-ref.js';
-
-# MathJax after Allegro
-if($action == 'aedit') {
-  $ModuleHeaderFmt[] = 'js-lib/Sortable.min.js'; # drag-and-drop
-  $ModuleHeaderFmt[] = array('js-lib/tex-svg.js', # MathJax formulas
-    'id'=>'MathJax-script', 'async'=>'async'); 
-}
 
 if(MatchNames($pagename, $Modules['allegro']['FormsGroup'].".*")) {
-  # Actually loaded from pmwiki-ace.js
   # Needs to be on CDN or put languages to modules/js-lib
+  # Also actually loaded from pmwiki-ace.js if needed
   $HTMLHeaderFmt['ace'] = '<script data-src="https://cdn.jsdelivr.net/npm/ace-builds@1.12.3/src-noconflict/ace.min.js"></script>';
-  
-  $ModuleHeaderFmt[] = 'allegro/pmwiki-ace.js';
-  $ModuleHeaderFmt[] = 'allegro/pmwiki-ace.css';
+  $ModuleHeaderFmt[] = "$ModuleDirUrl/pmwiki-ace.js pmwiki-ace.css";
 }
 
 $HTMLHeaderFmt['libcalcform'] = '<script src="$PageUrl?action=libcalc"></script>';
