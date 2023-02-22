@@ -350,8 +350,9 @@ nav.allegro-subpages li a:hover {
   opacity: .5;
 }
 
-.inputbox, .inputbutton,
-#allegroeditform select {
+.trix-content .inputbox, .trix-content .inputbutton,
+.trix-content #allegroeditform select,
+.inputbox, .inputbutton, #allegroeditform select {
   border: var(--tree-lines);
   border-radius: 3px;
   padding: 4px 8px;
@@ -1085,3 +1086,7 @@ p.reviewstatus-reviewed {
   color: green;
 }
 
+a.restorecode {
+  float:right;
+  color: #888;
+}

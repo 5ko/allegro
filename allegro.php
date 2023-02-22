@@ -30,7 +30,7 @@
   * Lazy Image Loading?
   
 */
-$RecipeInfo['Allegro']['Version'] = '20230212';
+$RecipeInfo['Allegro']['Version'] = '20230220';
 
 Markup("allegro", '<&amp;amp;', "/\\(:allegro( .*?)?:\\)\n?(.*?)\n?\\(:allegroend:\\)/is", 'FmtAllegro');
 
@@ -72,7 +72,9 @@ SDVA($Allegro, array(
   'DataDir' => "$WorkDir/.allegro",
   'AnonymousNewPagePat' => '-*',
   'EnableSubpages'=>1,
-  'TagCloud' => [
+  'EnableUpload'=>1,
+  'EnableTitle'=>1,
+  'TagCloud' => array(
     'fmt'=> "<a class='taglink' style=\"font-size:%.3Fem;\" title=\"$[%d pages]\" 
       href=\"{\$PageUrl}?action=atag&amp;t=%s\">%s</a> ",
     'order'=>'alpha',
@@ -80,9 +82,9 @@ SDVA($Allegro, array(
     'min' => 1,
     'minfontsize'=> .9,
     'maxfontsize'=> 1.8,
-  ],
-  'allegro2wiki' =>[ '`' => '&#96;', '´' => '&#180;'],
-  'allegro2wiki2' =>[ 
+  ),
+  'allegro2wiki' =>array( '`' => '&#96;', '´' => '&#180;'),
+  'allegro2wiki2' =>array( 
     '<h2>'  => '`!', '</h2>' => '!´',
     '<h3>'  => '`?', '</h3>' => '?´',
     '<div>' => '`<', '</div>' => '<´',
@@ -97,7 +99,7 @@ SDVA($Allegro, array(
     '<em>'  => '`/', '</em>' => '/´',
     '<strong>'  => '`+', '</strong>' => '+´',
     '&nbsp;' => '`.', '<br>'  => '`\\',
-  ],
+  ),
 ));
 
 SDVA($Allegro['allegro2wiki'], $Allegro['allegro2wiki2']);
@@ -155,13 +157,20 @@ function AllegroCondSubpages($pagename) {
   return false;
 }
 
+SDV($QualifyPatterns["/(\\(:allegro)(( .*?)?:\\)\n?(.*?)\n?\\(:allegroend:\\))/is"],
+    'cb_qualifyallegro');
+function cb_qualifyallegro($m) {
+  extract($GLOBALS["tmp_qualify"]); 
+  return "{$m[1]} qualifypagename=$pagename{$m[2]}";
+}
+
 function FmtAllegroRevDiff($m) {
   global $DiffFunction, $FmtV;
   extract($GLOBALS['MarkupToHTML']);
   $text = strval(@$FmtV['$PageSourceText']);
   $rtext = PageVar($pagename, '$ReviewText');
   $diff = $DiffFunction($text, $rtext);
-  return KeepBlock(DiffHTML($pagename, $diff));
+  return KeepBlock(DiffHTML($pagename, $diff).$FmtV['$SubpagesReordered']);
 }
 
 function FmtAllegro($m) {
@@ -171,9 +180,11 @@ function FmtAllegro($m) {
   extract($GLOBALS['MarkupToHTML']);
   
   $args = ParseArgs($m[1]);
-  $html = trim(htmlspecialchars_decode($m[2]));  
+  $html = trim(htmlspecialchars_decode($m[2]));
   
-  $html = wiki2html($pagename, $html);
+  $pn = isset($args['qualifypagename'])? $args['qualifypagename']:$pagename;
+  
+  $html = wiki2html($pn, $html);
 
   if(@$args['editor']) {
     $html = @"<div class='allegro-editor'>
@@ -185,16 +196,17 @@ function FmtAllegro($m) {
     asort($Allegro['PostProcessFunctions']);
     
     foreach($Allegro['PostProcessFunctions'] as $fn=>$pos) {
-      if($pos>0) $html = $fn($pagename, $html, $args);
+      if($pos>0) $html = $fn($pn, $html, $args);
     }
     
-    $pagestatus = PageTextVar($pagename, 'Status');
+    $pagestatus = PageTextVar($pn, 'Status');
     
     $html = "<div class='trix-content allegro-content' data-status='$pagestatus'>$html</div>";
     
     $out = KeepBlock($html);
+    if(!@$args['qualifypagename'])
+      $out = "(:include Site.ReviewHeader:)\n$out\n(:allegro-pages mode=subpages:)\n";
     
-    $out = "(:include Site.ReviewHeader:)\n$out\n(:allegro-pages mode=subpages:)\n";
     return PRR($out);
   }
 }
@@ -476,6 +488,7 @@ function AllegroData($g, $save = false){
       }
     }
     $data['=nextpagename'] = sprintf($Allegro['NextPageNameFmt'], $g, $max + 1);
+    $data['=group'] = $g;
     $AllegroData[$g] = $data;
   }
   if($save) {
@@ -534,7 +547,7 @@ function FmtAllegroLst($g, $names, $data, $args, $defaultcname, $defaultlabel) {
     $ntt = Keep($nt);
     $out .= "* [[ $g.$nn\"$ntt\" | $nt ]] \n";
   } 
-  if($out) {
+  if($out || @$args['evenempty'] ) {
     $cname = @$args['cname']? $args['cname'] : $defaultcname;
     
     $label = isset($args['label']) ? $args['label'] : $defaultlabel;
@@ -685,6 +698,11 @@ function FmtAllegroLinks($m) {
   if($args['mode'] == 'breadcrumbs') {
     $cname = @$args['cname']? $args['cname'] : 'allegro-breadcrumbs';
     
+    if(1 && @$args['talkgroup'] == $g) {
+      $an = PageVar($pagename, '$ArticleName');
+      return PRR("(:nav class=\"$cname\":)\n* [[$an| $[Article] ]]\n(:navend:)\n");
+    }
+    
     $parents = array();
     
     $parent = strval(@$data[$n]['parent']);
@@ -795,8 +813,8 @@ function AllegroTreeList($data, $nn, $level=0) {
   $sp = $data['=subpages'];
   $label = PHSC($data[$nn]['title']);
   $indent = str_repeat('*', $level);
-  
-  $out = "{$indent}[[{*\$Group}.$nn|$label]]\n";
+  $g = $data['=group'];
+  $out = "{$indent}[[$g.$nn|$label]]\n";
   $level++;
   if(isset($sp[$nn])) foreach($sp[$nn] as $sn) {
     $out .= AllegroTreeList($data, $sn, $level);
@@ -963,6 +981,7 @@ function HandleAllegroEdit(&$pagename, $auth = 'edit') {
   
   pm_session_start();
   
+  
   $page = $page2 = AllegroRetrieveNewPage($pagename, $auth, true);
   if(!$page) {
     unset($_SESSION['AllegroEdit']);
@@ -976,7 +995,11 @@ function HandleAllegroEdit(&$pagename, $auth = 'edit') {
     $posted = 0;
   }
   
-  $canupload = CondAuth($pagename, 'upload');
+  $canreview = CondAuth($pagename, 'attr');
+  if(!$Allegro['EnableUpload']) {
+    $canupload = false;
+  }
+  else $canupload = $canreview || CondAuth($pagename, 'upload');
   
   $_SESSION['AllegroEdit'][$g] = 1;
   
@@ -1044,9 +1067,10 @@ function HandleAllegroEdit(&$pagename, $auth = 'edit') {
       $pagedata['sporder'] = $new['sporder'] = $sporder;
     }
     $status = AllegroSanitizeVar(trim(strval(@$_POST["ptv_Status"])));
-    if($status == 'reviewed' && !CondAuth($pagename, 'attr')) {
+    if($status == 'reviewed' && !$canreview) {
       $status = $_POST["ptv_Status"] = 'draft';
     }
+    
     $pagedata['status'] = $new['status'] = $status;
     
     
@@ -1063,11 +1087,23 @@ function HandleAllegroEdit(&$pagename, $auth = 'edit') {
     $new['title'] = $title;
     $new['text'] = rtrim(preg_replace('/\\(:title .*?:\\)/i', '', $new['text']));
     $new['text'] = rtrim($new['text']) . "\n(:title $title:)\n";
+    
+    
     if($status == 'reviewed') {
       $new['reviewtext'] = $new['text'];
       $new['reviewtime'] = $Now;
       $new['reviewby'] = $AuthId;
     }
+    elseif($status == 'pending') {
+      $rtext = preg_replace('/\\(:Status:\\S+?:\\)/', '(:Status:reviewed:)', $new['text']);
+      if(@$new['reviewtext']==$rtext) {
+        $status = 'reviewed';
+        $pagedata['status'] = $new['status'] = $status;
+        $new['reviewtime'] = $Now;
+        $new['text'] = $rtext;
+      }
+    }
+    
     list($g, $n) = explode('.', $pagename);
     
     $new["csum"] = $new["csum:$Now"] = $ChangeSummary;
@@ -1093,7 +1129,11 @@ function HandleAllegroEdit(&$pagename, $auth = 'edit') {
   $InputValues['author'] = $Author;
   $InputValues['authid'] = $AuthId;
   
-  $XL['en']['ULnopermissions'] = 'No upload permissions, please create an account to attach files.';
+  if(@$_REQUEST['restore']) {
+    $InputValues['ptv_Status'] = $canreview? "reviewed" : "pending";
+  }
+  
+  $XL['en']['ULnopermissions'] = 'You cannot attach files to this page.';
   $codes = array();
   foreach($XL['en'] as $k=>$v) {
     if(! preg_match('!^(UL|W_|A_)!', $k)) continue;
@@ -1817,9 +1857,10 @@ function HandleAllegroDelete($pagename, $auth = 'attr') {
   return Redirect($parent);
 }
 
-$DiffRestoreFmt = "<div class='diffrestore'>
-  <a href='{\$PageUrl}?action=aedit&amp;restore=\$DiffId' title=\"$[Restore in visual editor]\">$[Restore]</a> |
-  <a href='{\$PageUrl}?action=edit&amp;restore=\$DiffId&amp;preview=y' title=\"$[Restore in code editor]\">$[Restore code]</a>
+$DiffRestoreFmt = "\$SubpagesReordered
+<div class='diffrestore'>
+  <a href='{\$PageUrl}?action=aedit&amp;restore=\$DiffId' title=\"$[Restore in visual editor]\">$[Restore]</a>
+  <a class='restorecode' href='{\$PageUrl}?action=edit&amp;restore=\$DiffId&amp;preview=y' title=\"$[Restore in code editor]\">$[Restore code]</a>
   </div>";
 
 $PageDiffFmt = array(
@@ -1828,7 +1869,16 @@ $PageDiffFmt = array(
 );
 $DiffRenderSourceFunction = 'AllegroDiffRenderSource';
 $DiffPrepareInlineFunction = 'AllegroDiffPrepare';
+$FmtV['$SubpagesReordered'] = '';
 function AllegroDiffRenderSource($in, $out, $which) {
+  global $pagename, $FmtV;
+  $FmtV['$SubpagesReordered'] = '';
+  static $g, $data;
+  if(is_null($data)) {
+    list($g, $n) = explode('.', $pagename);
+    $data = AllegroData($g);
+  }
+  
   $rarr = [
     '!(`[<>\\\\~]|[<>*#\\!?~]´)!' => '',
     '!(`=\\d|=´)!' => '',
@@ -1839,6 +1889,8 @@ function AllegroDiffRenderSource($in, $out, $which) {
     '!`\\!!' => '[H1]',
     '!`\\?!' => '[H2]',
   ];
+  $iin = implode("\n", $in);
+  $iout = implode("\n", $out);
   $in = PPRA($rarr, $in);
   $out = PPRA($rarr, $out);
   
@@ -1858,6 +1910,28 @@ function AllegroDiffRenderSource($in, $out, $which) {
 //     '!!' => '',
   ];
   $rendered = PPRA($r2, $rendered);
+  
+  if($which) {
+    $mo = $mi = $label = false;
+    preg_match('/\\(:SPOrder:(.*?):\\)/', $iout, $mo);
+    preg_match('/\\(:SPOrder:(.*?):\\)/', $iin, $mi);
+    if($mo) {
+      if(!$mi || $mo[1] != $mi[1]) {
+        $subpages = explode(' ', $mo[1]);
+        $label = '$[Subpages reordered]';
+      }
+    }
+    elseif($mi) {
+      $subpages = [];
+      $label = '$[&gt; Restored alphabetical order of subpages]';
+    }
+    if($label) {
+      $x = FmtAllegroLst($g, $subpages, $data, ['evenempty'=>1], 'allegro-subpages', $label);
+      $FmtV['$SubpagesReordered'] = MarkupToHTML($pagename, $x);
+    }
+    
+  }
+  
   return $rendered;
 }
 
