@@ -1032,7 +1032,13 @@ function HandleAllegroEdit(&$pagename, $auth = 'edit') {
       $pagedata['parent'] = $parent;
     }
     
-    $title = trim(AllegroSanitizeVar($_POST['allegrotitle']));
+    $an = PageVar($pagename, '$ArticleName');
+    if(@$_POST['allegrotitle'])
+      $title = trim(AllegroSanitizeVar(@$_POST['allegrotitle']));
+    elseif($pagename != $an) {
+      $title = 'Talk: ' . PageVar($an, '$Title');
+    }
+    else $title = $n;
     $pagedata['title'] = $title;
     
     $text = allegro2wiki($_POST['allegrotext']);
@@ -1494,7 +1500,11 @@ function wikitag2html($m) {
   $prefix = $m[1];
   $tag = $m[2];
   
-  if($prefix=='~') return "[[Profiles/{$m[2]}|{$m[3]}]]";
+  if($prefix=='~') {
+    if(@$m[3]) $tag .= "|" .$m[3];
+    if(!PageExists("Profiles.{$m[2]}")) return $tag;
+    return "[[Profiles/$tag]]";
+  }
   if($prefix=='%') {
     $a = [
       'contentType' => 'allegro/form',
