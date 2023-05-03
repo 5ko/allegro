@@ -353,19 +353,15 @@ document.addEventListener("trix-file-accept", function(e){
     return;
   }
     
-    
-   if(file.size > Allegro.UploadMaxSize) {
+  if(file.size > Allegro.UploadMaxSize) {
     e.preventDefault();
     showInfo(Allegro.XL.ULtoobig);
     return;
   }
-  
-  
 });
 
 document.addEventListener("trix-attachment-add", function(e){  
   function uploadFileAttachment(attachment) {
-    
     var data = {
       action: 'aupload',
       n: Allegro.FullName,
@@ -374,6 +370,10 @@ document.addEventListener("trix-attachment-add", function(e){
       upname: normalize_fname(attachment.file.name),
       author: Allegro.Author
     };
+    var token = dqs('input[name="pmtoken"]');
+    if(token) {
+      data.pmtoken = token.value;
+    }
     xupload(Allegro.PageUrl + "?action=aupload", data, ucallback);
   }
   

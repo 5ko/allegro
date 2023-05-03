@@ -30,7 +30,7 @@
   * Lazy Image Loading?
   
 */
-$RecipeInfo['Allegro']['Version'] = '20230220';
+$RecipeInfo['Allegro']['Version'] = '20230503';
 
 Markup("allegro", '<&amp;amp;', "/\\(:allegro( .*?)?:\\)\n?(.*?)\n?\\(:allegroend:\\)/is", 'FmtAllegro');
 
@@ -145,16 +145,36 @@ $FmtPV['$ReviewTime'] = '@$page["reviewtime"]';
 $FmtPV['$ReviewText'] = '@$page["reviewtext"]';
 $FmtPV['$AllegroNextPageName'] = 'AllegroNextPageName($pn)';
 $FmtPV['$Status'] = '$page["status"]??"draft"';
+$FmtPV['$Level'] = 'AllegroPageLevel($group, $name)';
+$FmtPV['$TopLevelPage'] = 'AllegroPageLevel($group, $name, 1)';
 
 $Conditions['hassubpages'] = 'AllegroCondSubpages($pagename)';
 function AllegroCondSubpages($pagename) {
-  global $Allegro, $AllegroData;
   list($g, $n) = explode('.', $pagename);
   
   $data = AllegroData($g);
   $apage = @$data[$n];
   if($apage && isset($data['=subpages'][$n])) return count($data['=subpages'][$n]);
   return false;
+}
+
+function AllegroPageLevel($group, $name, $parent=false) {
+  $data = AllegroData($group);
+  $apage = @$data[$name];
+  
+  $level = 0;
+  $parents = [];
+  while(@$apage['parent'] && ++$level) {
+    array_unshift($parents, $group.'.'.$apage['parent']);
+    $apage = @$data[$apage['parent']];
+  }
+  
+  if($parent) {
+    $lastparent = @$parents[$parent];
+    if($lastparent) return $lastparent;
+    return "$group.$name";
+  }
+  return $level;
 }
 
 SDV($QualifyPatterns["/(\\(:allegro)(( .*?)?:\\)\n?(.*?)\n?\\(:allegroend:\\))/is"],
@@ -811,10 +831,11 @@ function FmtAllegroLinks($m) {
 function AllegroTreeList($data, $nn, $level=0) {
   if(preg_match('/^Template/', $nn)) return '';
   $sp = $data['=subpages'];
-  $label = PHSC($data[$nn]['title']);
+  $label = PHSC(@$data[$nn]['title']);
   $indent = str_repeat('*', $level);
   $g = $data['=group'];
   $out = "{$indent}[[$g.$nn|$label]]\n";
+//   $out = "{$indent}[[$g.$nn|$label]] (level={{$g}.$nn\$Level} top={{$g}.$nn\$TopLevelPage}) title={{{$g}.$nn\$TopLevelPage}\$Title})\n";
   $level++;
   if(isset($sp[$nn])) foreach($sp[$nn] as $sn) {
     $out .= AllegroTreeList($data, $sn, $level);
@@ -970,6 +991,15 @@ function AnonUserSetPagePerms($pagename = null) {
 @$LogoutCookies[] = 'known_user';
 
 
+
+array_unshift($EditFunctions, 'AllegroUpdateReviewStamp');
+function AllegroUpdateReviewStamp($pagename, $page, &$new) {
+  global $Now;
+  if(isset($new['reviewtext'], $new['text'], $new['reviewtime']) 
+    && $new['reviewtext']==$new['text']) 
+      $new['reviewtime'] = $Now;
+}
+
 function HandleAllegroEdit(&$pagename, $auth = 'edit') {
   global $UploadMaxSize, $XL, $Allegro, $AllegroData, $Now, $PageStartFmt,
     $PageEndFmt, $WikiDir, $ChangeSummary,
@@ -988,6 +1018,7 @@ function HandleAllegroEdit(&$pagename, $auth = 'edit') {
     return Abort('? $[No permissions]');
   }
   if(isset($_POST['allegrotext'])) {
+    pmtoken(1, true);
     $posted = 1;
   }
   else {
@@ -1497,8 +1528,10 @@ function wikiattach2html($m, $pagename) {
 }
 
 function wikitag2html($m) {
+  $m = array_map('trim', $m);
   $prefix = $m[1];
   $tag = $m[2];
+  
   
   if($prefix=='~') {
     if(@$m[3]) $tag .= "|" .$m[3];
@@ -1543,6 +1576,7 @@ function wikiref2html($m) {
 }
 
 function wikilink2html($m, $pagename) {
+  
   return MakeLink($pagename,$m[1],@$m[2]);
 }
 
@@ -1579,6 +1613,8 @@ function wiki2html($pagename, $in, $edit=false) {
   
   return $out;
 }
+
+
 
 $EditFunctions[] = 'AllegroFormSaveTranslations';
 function AllegroFormSaveTranslations($pagename, $page, $new) {
